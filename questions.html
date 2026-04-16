@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scholar Siege TD - Question Editor</title>
+  <link rel="stylesheet" href="questions.css">
+</head>
+<body>
+  <main class="editor-shell">
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">Question Editor</p>
+        <h1>Build your own quiz pack</h1>
+        <p class="hero-copy">Create custom questions, save them in your browser, and the tower defense game will use them automatically.</p>
+      </div>
+      <a href="index.html" class="back-link">Back to Game</a>
+    </section>
+
+    <section class="editor-grid">
+      <article class="panel">
+        <h2>Create Question</h2>
+        <form id="questionForm" class="question-form">
+          <label>
+            Question
+            <textarea id="questionText" rows="4" required></textarea>
+          </label>
+          <label>
+            Option 1
+            <input id="option1" type="text" required>
+          </label>
+          <label>
+            Option 2
+            <input id="option2" type="text" required>
+          </label>
+          <label>
+            Option 3
+            <input id="option3" type="text" required>
+          </label>
+          <label>
+            Option 4
+            <input id="option4" type="text" required>
+          </label>
+          <label>
+            Correct Answer
+            <select id="answerSelect" required>
+              <option value="option1">Option 1</option>
+              <option value="option2">Option 2</option>
+              <option value="option3">Option 3</option>
+              <option value="option4">Option 4</option>
+            </select>
+          </label>
+          <label>
+            Gold Reward
+            <input id="rewardInput" type="number" min="1" value="25" required>
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary-button">Save Question</button>
+            <button type="button" id="clearFormButton" class="secondary-button">Clear</button>
+          </div>
+          <p id="formMessage" class="form-message"></p>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="saved-header">
+          <div>
+            <h2>Saved Questions</h2>
+            <p id="savedCount">0 custom questions saved.</p>
+          </div>
+          <button id="clearAllButton" class="danger-button">Clear All</button>
+        </div>
+        <div id="savedQuestionsList" class="saved-questions-list"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="questions.js"></script>
+</body>
+</html>

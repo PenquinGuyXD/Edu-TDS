@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scholar Siege TD</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="stat-card"><span class="stat-label">HP</span><strong id="hpValue">100</strong></div>
+      <div class="stat-card"><span class="stat-label">Gold</span><strong id="goldValue">120</strong></div>
+      <div class="stat-card"><span class="stat-label">Wave</span><strong id="waveValue">0</strong></div>
+      <div class="stat-card"><span class="stat-label">Gold Multiplier</span><strong id="multiplierValue">1.00x</strong></div>
+      <div class="stat-card"><span class="stat-label">Status</span><strong id="statusValue">Ready</strong></div>
+    </header>
+
+    <main class="main-layout">
+      <section class="playfield-panel">
+        <div class="canvas-frame">
+          <canvas id="gameCanvas" width="960" height="540"></canvas>
+          <div id="pausedOverlay" class="overlay hidden">
+            <div class="overlay-card">
+              <h2>Paused</h2>
+              <p>The battlefield is on hold.</p>
+            </div>
+          </div>
+      <div id="gameOverOverlay" class="overlay hidden">
+            <div class="overlay-card">
+              <h2>Base Lost</h2>
+              <p id="gameOverSummary">Your scholars fought bravely.</p>
+              <button id="gameOverRestartButton" class="primary-button">Restart Run</button>
+            </div>
+          </div>
+          <div id="preMatchOverlay" class="overlay">
+            <div class="overlay-card pre-match-card">
+              <h2>Choose Your Map</h2>
+              <p id="mapIntroText">Pick a battlefield before the match begins.</p>
+              <div id="mapSelectionList" class="map-selection-list"></div>
+              <button id="startMatchButton" class="primary-button">Start Match</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Actions</h2>
+            <p>Questions power towers and abilities while waves start instantly.</p>
+          </div>
+          <a href="questions.html" class="secondary-button panel-link-button">Question Editor</a>
+          <div class="button-grid">
+            <button id="answerQuestionButton" class="primary-button">Answer Question</button>
+            <button id="startWaveButton" class="primary-button">Start Wave</button>
+            <button id="pauseButton" class="secondary-button">Pause</button>
+            <button id="restartButton" class="danger-button">Restart</button>
+          </div>
+          <details class="dropdown-panel">
+            <summary>Abilities</summary>
+            <div class="dropdown-content">
+              <div class="button-grid">
+                <button id="bombButton" class="secondary-button">Bomb Strike</button>
+                <button id="freezeButton" class="secondary-button">Freeze</button>
+              </div>
+              <div class="cooldown-list">
+                <div><span>Bomb</span><strong id="bombCooldownValue">Ready</strong></div>
+                <div><span>Freeze</span><strong id="freezeCooldownValue">Ready</strong></div>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Build Towers</h2>
+            <p>Select a tower, answer a question, then place it on the field.</p>
+          </div>
+          <details class="dropdown-panel" open>
+            <summary>Tower Shop</summary>
+            <div class="dropdown-content">
+              <div class="tower-shop" id="towerShop"></div>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Selected Tower</h2>
+            <p>Upgrade or sell your placed tower.</p>
+          </div>
+          <div id="selectedTowerPanel" class="selected-panel empty">
+            <p>Select a tower on the map.</p>
+          </div>
+          <button id="quickSellButton" class="danger-button panel-action-button" disabled>Sell Selected Tower</button>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>How To Play</h2>
+            <p>Learn, defend, and survive.</p>
+          </div>
+          <ul class="info-list">
+            <li>Correct answers earn gold and activate tower and ability purchases.</li>
+            <li>Farm Towers boost question rewards for the whole run.</li>
+            <li>Sniper Towers hit hard across nearly the whole map.</li>
+            <li>Starting a wave no longer needs a question prompt.</li>
+            <li>Each new match begins with a map selection.</li>
+            <li>If an enemy reaches the base, you lose HP equal to its remaining health.</li>
+          </ul>
+        </section>
+      </aside>
+    </main>
+
+    <section class="multiplayer-section">
+      <div class="multiplayer-panel">
+        <div class="panel-header">
+          <h2>1v1 Multiplayer</h2>
+          <p>Join a room, share your screen, and send pressure to your opponent.</p>
+        </div>
+        <div class="multiplayer-grid">
+          <div class="multiplayer-card">
+            <h3>Room Setup</h3>
+            <div class="multiplayer-form">
+              <input id="playerNameInput" type="text" maxlength="24" placeholder="Your name">
+              <input id="roomCodeInput" type="text" maxlength="16" placeholder="Room code">
+            </div>
+            <div class="button-grid">
+              <button id="joinRoomButton" class="primary-button">Join 1v1 Room</button>
+              <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
+            </div>
+            <div class="multiplayer-status-list">
+              <div><span>Status</span><strong id="multiplayerStatus">Offline</strong></div>
+              <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
+              <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
+              <div><span>Opponent</span><strong id="opponentStatusValue">Waiting</strong></div>
+            </div>
+          </div>
+
+          <div class="multiplayer-card">
+            <h3>Screen Share</h3>
+            <p class="multiplayer-copy">Share your board and scroll down to watch the opponent stream below.</p>
+            <div class="button-grid">
+              <button id="shareScreenButton" class="secondary-button" disabled>Share Screen</button>
+              <button id="stopShareButton" class="danger-button" disabled>Stop Share</button>
+            </div>
+            <video id="localPreview" class="screen-preview" autoplay muted playsinline></video>
+          </div>
+
+          <div class="multiplayer-card">
+            <h3>Send Enemies</h3>
+            <p class="multiplayer-copy">Spend gold and answer correctly to spawn enemies on the opponent side.</p>
+            <div class="enemy-send-grid">
+              <button id="sendBasicEnemyButton" class="secondary-button" disabled>Send Scout Rush</button>
+              <button id="sendFastEnemyButton" class="secondary-button" disabled>Send Speedsters</button>
+              <button id="sendTankEnemyButton" class="secondary-button" disabled>Send Tank Drop</button>
+            </div>
+            <div class="multiplayer-status-list compact">
+              <div><span>Scout Rush</span><strong>35g</strong></div>
+              <div><span>Speedsters</span><strong>55g</strong></div>
+              <div><span>Tank Drop</span><strong>90g</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="multiplayer-panel opponent-panel">
+        <div class="panel-header">
+          <h2>Opponent Screen</h2>
+          <p>Scroll down here anytime to watch the other player’s live board.</p>
+        </div>
+        <video id="remoteScreen" class="remote-screen" autoplay playsinline controls></video>
+      </div>
+    </section>
+  </div>
+
+  <div id="questionModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Answer The Question</h2>
+        <div class="timer-shell">
+          <span id="questionTimerText">10s</span>
+          <div class="timer-bar"><div id="questionTimerFill" class="timer-fill"></div></div>
+        </div>
+      </div>
+      <p id="questionPrompt" class="question-text"></p>
+      <div id="questionOptions" class="question-options"></div>
+      <p id="questionFeedback" class="modal-feedback"></p>
+    </div>
+  </div>
+
+  <div id="restartModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card small">
+      <h2>Restart Game?</h2>
+      <p>Are you sure you want to restart?</p>
+      <div class="confirm-actions">
+        <button id="confirmRestartButton" class="danger-button">Yes</button>
+        <button id="cancelRestartButton" class="secondary-button">No</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

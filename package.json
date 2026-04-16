@@ -1,0 +1,9 @@
+{
+  "name": "scholar-siege-td",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scholar Siege TD with lightweight 1v1 multiplayer foundation",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
