@@ -47,6 +47,19 @@ function refreshQuestionBank() {
   return questions;
 }
 
+function normalizeQuestionContext(context) {
+  if (typeof context === "string") {
+    return { id: context, suppressReward: false };
+  }
+  if (context && typeof context === "object") {
+    return {
+      id: String(context.id || "").trim(),
+      suppressReward: Boolean(context.suppressReward)
+    };
+  }
+  return { id: "", suppressReward: false };
+}
+
 const towerCatalog = {
   basic: {
     key: "basic", name: "Scout", cost: 60, color: "#58b8ff", damage: 14, range: 118, fireRate: 1.15, projectileSpeed: 360,
@@ -191,7 +204,8 @@ const GameState = {
       lastTime: 0,
       freezeRemaining: 0,
       abilityCooldowns: { bomb: 0, freeze: 0 },
-      hoverPoint: { x: 0, y: 0, inside: false }
+      hoverPoint: { x: 0, y: 0, inside: false },
+      spectatedPlayerId: null
     };
   },
   reset() {
@@ -205,6 +219,7 @@ const GameState = {
     UIManager.updateAll();
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportHealth(true);
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportGold(true);
+    if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportBoard(true);
   },
   getFarmMultiplier() {
     // Economy system: only questions and enemy kills create gold.
@@ -304,6 +319,10 @@ class Enemy {
     if (GameState.state.hp <= 0) {
       GameState.state.isGameOver = true;
       GameState.state.waveInProgress = false;
+      if (MultiplayerManager.state.connected) {
+        const fallbackPlayer = MultiplayerManager.state.players.find((player) => player.id !== MultiplayerManager.state.playerId && MultiplayerManager.state.boards[player.id]);
+        GameState.state.spectatedPlayerId = fallbackPlayer?.id || MultiplayerManager.state.playerId || null;
+      }
       const summary = MultiplayerManager.state.connected
         ? "Your base fell. You are now spectating the rest of the room."
         : `Wave ${GameState.state.wave} overwhelmed the base.`;
@@ -659,7 +678,7 @@ const QuestionManager = {
       return false;
     }
     GameState.state.isQuestionOpen = true;
-    GameState.state.questionGate = context;
+    GameState.state.questionGate = normalizeQuestionContext(context);
     this.pendingCallback = callback;
     this.activeQuestion = questions[Math.floor(Math.random() * questions.length)];
     this.timeRemaining = 10;
@@ -684,21 +703,24 @@ const QuestionManager = {
   resolve(correct, label) {
     if (!GameState.state.isQuestionOpen) return;
     const question = this.activeQuestion;
+    const questionContext = normalizeQuestionContext(GameState.state.questionGate);
     const multiplier = GameState.getFarmMultiplier();
     let reward = 0;
     let penalty = 0;
 
     if (correct) {
+      if (!questionContext.suppressReward) {
       reward = Math.round(question.reward * multiplier);
       GameState.addGold(reward);
       GameState.state.particles.push(new FloatingText(`+${reward}g`, 40, 40, "#ffcf5d"));
+      }
     } else {
       penalty = 6;
       GameState.state.gold = Math.max(0, GameState.state.gold - penalty);
       GameState.state.particles.push(new FloatingText(`-${penalty}g`, 40, 40, "#ff8a8a"));
     }
 
-    UIManager.setQuestionFeedback(correct ? `${label} +${reward} gold.` : `${label} -${penalty} gold.`);
+    UIManager.setQuestionFeedback(correct ? (reward > 0 ? `${label} +${reward} gold.` : label) : `${label} -${penalty} gold.`);
 
     setTimeout(() => {
       if (this.intervalId) {
@@ -707,7 +729,7 @@ const QuestionManager = {
       }
       GameState.state.isQuestionOpen = false;
       const cb = this.pendingCallback;
-      const payload = { correct, reward, penalty, context: GameState.state.questionGate };
+      const payload = { correct, reward, penalty, context: questionContext };
       this.activeQuestion = null;
       this.pendingCallback = null;
       GameState.state.questionGate = null;
@@ -743,7 +765,10 @@ const UIManager = {
       freezeCooldownValue: document.getElementById("freezeCooldownValue"),
       pausedOverlay: document.getElementById("pausedOverlay"),
       gameOverOverlay: document.getElementById("gameOverOverlay"),
+      gameOverTitle: document.getElementById("gameOverTitle"),
       gameOverSummary: document.getElementById("gameOverSummary"),
+      spectatorPanel: document.getElementById("spectatorPanel"),
+      spectatorHealthList: document.getElementById("spectatorHealthList"),
       preMatchOverlay: document.getElementById("preMatchOverlay"),
       mapSelectionList: document.getElementById("mapSelectionList"),
       startMatchButton: document.getElementById("startMatchButton"),
@@ -826,26 +851,40 @@ const UIManager = {
     });
   },
   renderBoardHealth() {
-    const list = this.elements.boardHealthList;
+    this.renderPlayerHealthList(this.elements.boardHealthList, "Join a room from the lobby to see everyone's health here.");
+  },
+  renderSpectatorHealth() {
+    this.renderPlayerHealthList(this.elements.spectatorHealthList, "Waiting for room updates...");
+  },
+  renderPlayerHealthList(list, emptyText) {
     if (!list) return;
     const players = MultiplayerManager.state.players;
     list.innerHTML = "";
     if (!MultiplayerManager.state.connected || !players.length) {
       const item = document.createElement("li");
       item.className = "board-health-empty";
-      item.textContent = "Join a room from the lobby to see everyone's health here.";
+      item.textContent = emptyText;
       list.appendChild(item);
       return;
     }
     players.forEach((player) => {
-      const item = document.createElement("li");
+      const item = document.createElement(GameState.isMultiplayerSpectating() ? "button" : "li");
       item.className = "board-health-item";
+      if (GameState.isMultiplayerSpectating()) {
+        item.type = "button";
+        item.disabled = !MultiplayerManager.state.boards[player.id];
+        item.classList.toggle("selected", GameState.state.spectatedPlayerId === player.id);
+        item.addEventListener("click", () => Game.setSpectatedPlayer(player.id));
+      }
       const role = player.id === MultiplayerManager.state.hostId ? "Host" : "Player";
       const hp = typeof player.hp === "number" ? `${player.hp} HP` : "Waiting";
+      const spectateText = GameState.isMultiplayerSpectating()
+        ? (MultiplayerManager.state.boards[player.id] ? "Click to spectate" : "Waiting for board")
+        : role;
       item.innerHTML = `
         <div>
           <strong>${player.name}</strong>
-          <span>${role}${player.id === MultiplayerManager.state.playerId ? " - You" : ""}</span>
+          <span>${spectateText}${player.id === MultiplayerManager.state.playerId ? " - You" : ""}</span>
         </div>
         <strong>${hp}</strong>
       `;
@@ -857,7 +896,7 @@ const UIManager = {
     refreshQuestionBank();
     const { hp, gold, wave, isPaused, isGameOver, waveInProgress, abilityCooldowns, pendingPlacement } = GameState.state;
     const actionLocked = !GameState.canInteract() || Boolean(pendingPlacement);
-    const hostControlLocked = !MultiplayerManager.canControlMatch();
+    const onlineMatch = MultiplayerManager.state.connected;
     if (this.elements.hpValue) this.elements.hpValue.textContent = hp;
     this.elements.goldValue.textContent = gold;
     this.elements.waveValue.textContent = wave;
@@ -875,11 +914,10 @@ const UIManager = {
     this.elements.sendFastEnemyButton.disabled = raidLocked;
     this.elements.sendTankEnemyButton.disabled = raidLocked;
     this.elements.leaveRoomButton.disabled = !MultiplayerManager.state.connected;
-    this.elements.pauseButton.disabled = hostControlLocked || GameState.state.isQuestionOpen || GameState.state.isGameOver;
-    this.elements.restartButton.disabled =
-      hostControlLocked ||
-      GameState.state.isQuestionOpen ||
-      GameState.isMultiplayerSpectating();
+    this.elements.pauseButton.disabled = onlineMatch || GameState.state.isQuestionOpen || GameState.state.isGameOver;
+    this.elements.restartButton.disabled = onlineMatch || GameState.state.isQuestionOpen || GameState.isMultiplayerSpectating();
+    this.elements.pauseButton.classList.toggle("hidden", onlineMatch);
+    this.elements.restartButton.classList.toggle("hidden", onlineMatch);
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
     this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
     this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
@@ -888,6 +926,7 @@ const UIManager = {
     this.elements.playerRoleValue.textContent = MultiplayerManager.getRoleLabel();
     this.elements.questionSourceValue.textContent = MultiplayerManager.getQuestionSourceLabel();
     this.renderBoardHealth();
+    this.renderSpectatorHealth();
     this.elements.towerShop.querySelectorAll("button").forEach((button) => {
       button.disabled = actionLocked;
     });
@@ -983,17 +1022,22 @@ const UIManager = {
   },
   showGameOver(summary) {
     this.elements.gameOverSummary.textContent = summary;
+    const spectating = GameState.isMultiplayerSpectating();
+    if (this.elements.gameOverTitle) this.elements.gameOverTitle.textContent = spectating ? "Spectating Room" : "Base Lost";
+    if (this.elements.spectatorPanel) this.elements.spectatorPanel.classList.toggle("hidden", !spectating);
     const restartButton = document.getElementById("gameOverRestartButton");
     if (restartButton) {
-      const spectating = GameState.isMultiplayerSpectating();
       restartButton.classList.toggle("hidden", spectating);
       restartButton.disabled = spectating;
     }
-    this.elements.gameOverOverlay.classList.remove("hidden");
+    this.renderSpectatorHealth();
+    this.elements.gameOverOverlay.classList.toggle("hidden", spectating);
     this.updateAll();
   },
   hideGameOver() {
     if (this.elements.gameOverOverlay) this.elements.gameOverOverlay.classList.add("hidden");
+    if (this.elements.gameOverTitle) this.elements.gameOverTitle.textContent = "Base Lost";
+    if (this.elements.spectatorPanel) this.elements.spectatorPanel.classList.add("hidden");
     const restartButton = document.getElementById("gameOverRestartButton");
     if (restartButton) {
       restartButton.classList.remove("hidden");
@@ -1042,9 +1086,12 @@ const MultiplayerManager = {
     selectedMapId: MAPS[0].id,
     matchStarted: false,
     opponent: null,
+    boards: {},
     eventSource: null,
     lastSentHp: null,
-    lastSentGold: null
+    lastSentGold: null,
+    lastSentBoard: null,
+    lastBoardSentAt: 0
   },
   init() {
     const session = loadMultiplayerSession();
@@ -1114,6 +1161,7 @@ const MultiplayerManager = {
       this.state.players = Array.isArray(payload.players) ? payload.players : [];
       this.state.selectedMapId = payload.selectedMapId || MAPS[0].id;
       this.state.matchStarted = Boolean(payload.matchStarted);
+      this.state.boards = Object.fromEntries((Array.isArray(payload.players) ? payload.players : []).map((player) => [player.id, player.board || null]));
       this.state.side = this.isHost() ? "host" : "player";
       this.updateOpponent();
       this.openEventStream();
@@ -1125,6 +1173,7 @@ const MultiplayerManager = {
       }
       this.reportHealth(true);
       this.reportGold(true);
+      this.reportBoard(true);
       if (this.state.matchStarted) {
         Game.startMatch({ skipRelay: true, remoteMapId: this.state.selectedMapId });
       }
@@ -1162,9 +1211,12 @@ const MultiplayerManager = {
       selectedMapId: MAPS[0].id,
       matchStarted: false,
       opponent: null,
+      boards: {},
       eventSource: null,
       lastSentHp: null,
-      lastSentGold: null
+      lastSentGold: null,
+      lastSentBoard: null,
+      lastBoardSentAt: 0
     };
   },
   openEventStream() {
@@ -1182,6 +1234,7 @@ const MultiplayerManager = {
   applyRoomSnapshot(snapshot) {
     this.state.hostId = snapshot.hostId || this.state.hostId;
     this.state.players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    this.state.boards = Object.fromEntries(this.state.players.map((player) => [player.id, player.board || null]));
     this.state.selectedMapId = snapshot.selectedMapId || this.state.selectedMapId;
     this.state.matchStarted = Boolean(snapshot.matchStarted);
     this.state.side = this.isHost() ? "host" : "player";
@@ -1240,6 +1293,12 @@ const MultiplayerManager = {
       if (player) player.gold = event.payload.gold;
       this.updateOpponent();
       UIManager.updateAll();
+      return;
+    }
+
+    if (event.type === "board_update") {
+      this.state.boards[event.sender] = event.payload || null;
+      UIManager.updateAll();
     }
   },
   updateOpponent() {
@@ -1296,6 +1355,18 @@ const MultiplayerManager = {
     if (!force && this.state.lastSentGold === GameState.state.gold) return;
     this.state.lastSentGold = GameState.state.gold;
     this.relay("gold_update", { gold: GameState.state.gold });
+  },
+  reportBoard(force = false) {
+    if (!this.state.connected) return;
+    const now = Date.now();
+    if (!force && now - this.state.lastBoardSentAt < 250) return;
+    const board = Game.buildBoardSnapshot();
+    const serialized = JSON.stringify(board);
+    if (!force && this.state.lastSentBoard === serialized) return;
+    this.state.lastBoardSentAt = now;
+    this.state.lastSentBoard = serialized;
+    this.state.boards[this.state.playerId] = board;
+    this.relay("board_update", board);
   }
 };
 
@@ -1330,6 +1401,10 @@ const Game = {
       }
     });
     document.getElementById("restartButton").addEventListener("click", () => {
+      if (MultiplayerManager.state.connected) {
+        UIManager.setStatus("Restart is only available in singleplayer");
+        return;
+      }
       if (GameState.isMultiplayerSpectating()) {
         UIManager.setStatus("Defeated players spectate until the room match ends");
         return;
@@ -1341,6 +1416,11 @@ const Game = {
       if (!GameState.state.isQuestionOpen) UIManager.showRestartModal();
     });
     document.getElementById("confirmRestartButton").addEventListener("click", () => {
+      if (MultiplayerManager.state.connected) {
+        UIManager.hideRestartModal();
+        UIManager.setStatus("Restart is only available in singleplayer");
+        return;
+      }
       if (GameState.isMultiplayerSpectating()) {
         UIManager.hideRestartModal();
         UIManager.setStatus("Defeated players spectate until the room match ends");
@@ -1421,6 +1501,7 @@ const Game = {
     }
     MultiplayerManager.reportHealth(true);
     MultiplayerManager.reportGold(true);
+    MultiplayerManager.reportBoard(true);
     UIManager.setStatus(`${getCurrentMap().name} ready`);
     UIManager.updateAll();
   },
@@ -1433,17 +1514,23 @@ const Game = {
   requestSendEnemy(kind) {
     const raid = multiplayerEnemyCatalog[kind];
     if (!raid || !MultiplayerManager.canSendRaid()) return;
-    if (GameState.state.gold < raid.cost) {
-      UIManager.setStatus("Not enough gold to send raid");
-      return;
-    }
-    if (!GameState.spendGold(raid.cost)) {
-      UIManager.setStatus("Gold changed before raid");
-      return;
-    }
-    MultiplayerManager.sendRaid(kind);
-    UIManager.setStatus(`${raid.label} sent`);
-    UIManager.updateAll();
+    QuestionManager.ask({ id: `raid-${kind}`, suppressReward: true }, ({ correct }) => {
+      if (!correct) {
+        UIManager.setStatus("Raid canceled");
+        return;
+      }
+      if (GameState.state.gold < raid.cost) {
+        UIManager.setStatus("Not enough gold to send raid");
+        return;
+      }
+      if (!GameState.spendGold(raid.cost)) {
+        UIManager.setStatus("Gold changed before raid");
+        return;
+      }
+      MultiplayerManager.sendRaid(kind);
+      UIManager.setStatus(`${raid.label} sent`);
+      UIManager.updateAll();
+    });
   },
   requestTowerPurchase(type) {
     const towerData = towerCatalog[type];
@@ -1453,7 +1540,7 @@ const Game = {
       UIManager.setStatus("Not enough gold");
       return;
     }
-    QuestionManager.ask(`buy-${type}`, ({ correct }) => {
+    QuestionManager.ask({ id: `buy-${type}`, suppressReward: true }, ({ correct }) => {
       if (!correct) {
         UIManager.setStatus("Tower purchase failed");
         return;
@@ -1502,6 +1589,39 @@ const Game = {
     }
     GameState.state.selectedTowerId = selected ? selected.id : null;
     UIManager.updateSelectedTower();
+  },
+  setSpectatedPlayer(playerId) {
+    if (!GameState.isMultiplayerSpectating()) return;
+    if (!MultiplayerManager.state.boards[playerId]) {
+      UIManager.setStatus("That player's board is not ready yet");
+      return;
+    }
+    GameState.state.spectatedPlayerId = playerId;
+    const player = MultiplayerManager.state.players.find((entry) => entry.id === playerId);
+    UIManager.setStatus(player ? `Spectating ${player.name}` : "Spectating player");
+    UIManager.updateAll();
+  },
+  buildBoardSnapshot() {
+    return {
+      mapId: GameState.state.currentMapId,
+      wave: GameState.state.wave,
+      towers: GameState.state.towers.map((tower) => ({
+        type: tower.type,
+        x: tower.x,
+        y: tower.y,
+        level: tower.level
+      })),
+      enemies: GameState.state.enemies.filter((enemy) => enemy.isAlive).map((enemy) => ({
+        type: enemy.type,
+        x: enemy.x,
+        y: enemy.y,
+        radius: enemy.radius,
+        health: enemy.health,
+        maxHealth: enemy.maxHealth,
+        color: enemy.color,
+        senderName: enemy.senderName || ""
+      }))
+    };
   },
   upgradeSelectedTower() {
     if (!GameState.canInteract()) return;
@@ -1554,8 +1674,8 @@ const Game = {
     UIManager.updateAll();
   },
   togglePause() {
-    if (!MultiplayerManager.canControlMatch()) {
-      UIManager.setStatus("Only the host can pause a room match");
+    if (MultiplayerManager.state.connected) {
+      UIManager.setStatus("Pause is only available in singleplayer");
       return;
     }
     if (GameState.state.isGameOver || GameState.state.isQuestionOpen) return;
@@ -1601,17 +1721,26 @@ const Game = {
     }
     MultiplayerManager.reportHealth();
     MultiplayerManager.reportGold();
+    MultiplayerManager.reportBoard();
     UIManager.updateAll();
   },
   draw() {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    drawPath(ctx);
-    GameState.state.towers.forEach((tower) => tower.draw(ctx, tower.id === GameState.state.selectedTowerId));
-    GameState.state.flashes.forEach((flash) => flash.draw(ctx));
-    GameState.state.projectiles.forEach((projectile) => projectile.draw(ctx));
-    GameState.state.enemies.forEach((enemy) => enemy.draw(ctx));
-    GameState.state.particles.forEach((particle) => particle.draw(ctx));
+    const spectatedBoard = GameState.isMultiplayerSpectating()
+      ? MultiplayerManager.state.boards[GameState.state.spectatedPlayerId] || null
+      : null;
+
+    if (spectatedBoard) {
+      drawRemoteBoard(ctx, spectatedBoard);
+    } else {
+      drawPath(ctx);
+      GameState.state.towers.forEach((tower) => tower.draw(ctx, tower.id === GameState.state.selectedTowerId));
+      GameState.state.flashes.forEach((flash) => flash.draw(ctx));
+      GameState.state.projectiles.forEach((projectile) => projectile.draw(ctx));
+      GameState.state.enemies.forEach((enemy) => enemy.draw(ctx));
+      GameState.state.particles.forEach((particle) => particle.draw(ctx));
+    }
 
     if (GameState.state.pendingPlacement && GameState.state.hoverPoint.inside) {
       const { x, y } = GameState.state.hoverPoint;
@@ -1638,6 +1767,10 @@ const Game = {
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       ctx.restore();
     }
+
+    if (GameState.isMultiplayerSpectating()) {
+      drawSpectatorOverlay(ctx);
+    }
   },
   loop(timestamp) {
     if (!GameState.state.lastTime) GameState.state.lastTime = timestamp;
@@ -1656,6 +1789,14 @@ const Game = {
 
 function drawPath(ctx) {
   const map = getCurrentMap();
+  drawPathForMap(ctx, map);
+}
+
+function getMapById(mapId) {
+  return MAPS.find((map) => map.id === mapId) || MAPS[0];
+}
+
+function drawPathForMap(ctx, map) {
   const path = map.points;
   ctx.save();
   ctx.lineCap = "round";
@@ -1675,6 +1816,116 @@ function drawPath(ctx) {
   ctx.fillStyle = "#eef4ff";
   ctx.font = "bold 16px Segoe UI";
   ctx.fillText("BASE", end.x - 28, end.y - 2);
+  ctx.restore();
+}
+
+function drawRemoteBoard(ctx, board) {
+  const map = getMapById(board?.mapId);
+  drawPathForMap(ctx, map);
+  (board?.towers || []).forEach((tower) => drawTowerSnapshot(ctx, tower));
+  (board?.enemies || []).forEach((enemy) => drawEnemySnapshot(ctx, enemy));
+}
+
+function drawTowerSnapshot(ctx, tower) {
+  const data = towerCatalog[tower.type] || towerCatalog.basic;
+  const color = data.color;
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = color;
+  ctx.arc(tower.x, tower.y, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(10,20,34,0.8)";
+  ctx.stroke();
+  if (tower.type === "sniper") {
+    ctx.strokeStyle = "#111";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(tower.x, tower.y);
+    ctx.lineTo(tower.x + 16, tower.y - 16);
+    ctx.stroke();
+  } else if (tower.type === "farm") {
+    ctx.fillStyle = "rgba(80,50,8,0.35)";
+    ctx.fillRect(tower.x - 11, tower.y - 11, 22, 22);
+  }
+  ctx.fillStyle = "#eef4ff";
+  ctx.font = "bold 11px Segoe UI";
+  ctx.textAlign = "center";
+  ctx.fillText(`L${Number(tower.level || 0) + 1}`, tower.x, tower.y + 34);
+  ctx.restore();
+}
+
+function drawEnemySnapshot(ctx, enemy) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = enemy.color || "#59a6ff";
+  ctx.arc(enemy.x, enemy.y, enemy.radius || 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.stroke();
+  const radius = enemy.radius || 16;
+  const barWidth = radius * 2.3;
+  const healthRatio = Math.max(0, Math.min(1, (enemy.health || 0) / Math.max(1, enemy.maxHealth || 1)));
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(enemy.x - barWidth / 2, enemy.y - radius - 12, barWidth, 6);
+  ctx.fillStyle = "#57e389";
+  ctx.fillRect(enemy.x - barWidth / 2, enemy.y - radius - 12, barWidth * healthRatio, 6);
+  if (enemy.senderName) {
+    ctx.fillStyle = "rgba(4, 8, 15, 0.72)";
+    ctx.fillRect(enemy.x - 46, enemy.y - radius - 28, 92, 12);
+    ctx.fillStyle = "#ffcf5d";
+    ctx.font = "bold 10px Segoe UI";
+    ctx.textAlign = "center";
+    ctx.fillText(enemy.senderName, enemy.x, enemy.y - radius - 18);
+  }
+  ctx.restore();
+}
+
+function drawSpectatorOverlay(ctx) {
+  const players = MultiplayerManager.state.players || [];
+  const panelX = 18;
+  const panelY = 18;
+  const panelWidth = 310;
+  const rowHeight = 28;
+  const headerHeight = 68;
+  const panelHeight = headerHeight + Math.max(1, players.length) * rowHeight + 16;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(4, 8, 15, 0.76)";
+  ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+  ctx.strokeStyle = "rgba(255, 207, 93, 0.4)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+  ctx.fillStyle = "#ffcf5d";
+  ctx.font = "bold 24px Segoe UI";
+  ctx.fillText("Spectating Room", panelX + 16, panelY + 30);
+
+  ctx.fillStyle = "#eef4ff";
+  ctx.font = "13px Segoe UI";
+  ctx.fillText("Your base fell. You're still watching the live match.", panelX + 16, panelY + 52);
+
+  let y = panelY + 84;
+  if (!players.length) {
+    ctx.fillStyle = "#9eb0cf";
+    ctx.fillText("Waiting for room updates...", panelX + 16, y);
+  } else {
+    players.forEach((player) => {
+      const isHost = player.id === MultiplayerManager.state.hostId;
+      const isSelf = player.id === MultiplayerManager.state.playerId;
+      const hp = typeof player.hp === "number" ? player.hp : "--";
+      const gold = typeof player.gold === "number" ? player.gold : "--";
+      ctx.fillStyle = isSelf ? "#4ed6a8" : "#eef4ff";
+      ctx.font = "bold 13px Segoe UI";
+      ctx.fillText(`${player.name}${isSelf ? " (You)" : ""}${isHost ? " [Host]" : ""}`, panelX + 16, y);
+      ctx.fillStyle = "#ffcf5d";
+      ctx.textAlign = "right";
+      ctx.fillText(`${hp} HP | ${gold}g`, panelX + panelWidth - 16, y);
+      ctx.textAlign = "left";
+      y += rowHeight;
+    });
+  }
   ctx.restore();
 }
 

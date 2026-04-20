@@ -32,8 +32,14 @@
           </div>
           <div id="gameOverOverlay" class="overlay hidden">
             <div class="overlay-card">
-              <h2>Base Lost</h2>
+              <h2 id="gameOverTitle">Base Lost</h2>
               <p id="gameOverSummary">Your scholars fought bravely.</p>
+              <div id="spectatorPanel" class="spectator-panel hidden">
+                <h3>Live Room Status</h3>
+                <ul id="spectatorHealthList" class="spectator-health-list">
+                  <li class="board-health-empty">Waiting for room updates...</li>
+                </ul>
+              </div>
               <button id="gameOverRestartButton" class="primary-button">Restart Run</button>
             </div>
           </div>

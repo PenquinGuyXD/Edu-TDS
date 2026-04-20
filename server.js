@@ -79,6 +79,7 @@ function getOrCreateRoom(roomId) {
       hostQuestions: [],
       playerHealths: {},
       playerGolds: {},
+      playerBoards: {},
       selectedMapId: DEFAULT_MAP_ID,
       matchStarted: false
     });
@@ -123,7 +124,8 @@ function buildRoomSnapshot(room) {
       name: player.name,
       side: player.side,
       hp: typeof room.playerHealths[player.id] === "number" ? room.playerHealths[player.id] : null,
-      gold: typeof room.playerGolds[player.id] === "number" ? room.playerGolds[player.id] : null
+      gold: typeof room.playerGolds[player.id] === "number" ? room.playerGolds[player.id] : null,
+      board: room.playerBoards[player.id] || null
     }))
   };
 }
@@ -219,6 +221,7 @@ function handleLeave(req, res, body) {
   room.players = room.players.filter((player) => player.id !== body.playerId);
   delete room.playerHealths[body.playerId];
   delete room.playerGolds[body.playerId];
+  delete room.playerBoards[body.playerId];
 
   const stream = room.streams.get(body.playerId);
   if (stream) {
@@ -266,6 +269,9 @@ function handleRelay(req, res, body) {
   if (body.type === "gold_update") {
     room.playerGolds[sender.id] = Math.max(0, Math.round(Number(payload.gold) || 0));
   }
+  if (body.type === "board_update") {
+    room.playerBoards[sender.id] = payload && typeof payload === "object" ? payload : null;
+  }
 
   const event = {
     type: body.type,
@@ -282,7 +288,7 @@ function handleRelay(req, res, body) {
   }
 
   publish(room, event);
-  if (body.type === "health_update" || body.type === "gold_update" || body.type === "select_map" || body.type === "lobby_start") {
+  if (body.type === "health_update" || body.type === "gold_update" || body.type === "board_update" || body.type === "select_map" || body.type === "lobby_start") {
     publishRoom(room);
   }
   sendJson(res, 200, { ok: true });
