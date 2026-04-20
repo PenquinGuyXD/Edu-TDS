@@ -184,7 +184,7 @@ const GameState = {
       isGameOver: false,
       isQuestionOpen: false,
       isRestartModalOpen: false,
-      isPreMatch: true,
+      isPreMatch: false,
       waveInProgress: false,
       autoWaveCountdown: 0,
       questionGate: null,
@@ -201,7 +201,7 @@ const GameState = {
     QuestionManager.reset();
     UIManager.hideRestartModal();
     UIManager.hideGameOver();
-    UIManager.showPreMatch();
+    UIManager.hidePreMatch();
     UIManager.updateAll();
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportHealth(true);
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportGold(true);
@@ -728,6 +728,7 @@ const UIManager = {
       selectedTowerPanel: document.getElementById("selectedTowerPanel"),
       quickSellButton: document.getElementById("quickSellButton"),
       pauseButton: document.getElementById("pauseButton"),
+      restartButton: document.getElementById("restartButton"),
       startWaveButton: document.getElementById("startWaveButton"),
       answerQuestionButton: document.getElementById("answerQuestionButton"),
       bombButton: document.getElementById("bombButton"),
