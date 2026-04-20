@@ -843,7 +843,7 @@ const UIManager = {
     this.elements.multiplierValue.textContent = `${GameState.getFarmMultiplier().toFixed(2)}x`;
     this.elements.pauseButton.textContent = isPaused ? "Resume" : "Pause";
     this.elements.pausedOverlay.classList.toggle("hidden", !isPaused || isGameOver);
-    this.elements.startMatchButton.disabled = questions.length === 0;
+    this.elements.startMatchButton.disabled = MultiplayerManager.state.connected && !MultiplayerManager.isHost();
     this.elements.startWaveButton.disabled = actionLocked || waveInProgress;
     this.elements.answerQuestionButton.disabled = actionLocked;
     this.elements.bombButton.disabled = actionLocked || abilityCooldowns.bomb > 0;
@@ -963,16 +963,18 @@ const UIManager = {
   },
   showPreMatch() {
     if (!this.elements.preMatchOverlay) return;
-    this.renderMapSelection();
-    if (questions.length === 0) {
-      this.elements.mapIntroText.textContent = MultiplayerManager.state.connected && !MultiplayerManager.isHost()
-        ? "Waiting for the host to bring in at least one custom question."
-        : "You need at least one custom question before starting a match.";
-      this.elements.preMatchQuestionLink.classList.toggle("hidden", MultiplayerManager.state.connected && !MultiplayerManager.isHost());
+    if (MultiplayerManager.state.connected) {
+      const roomMap = MAPS.find((map) => map.id === MultiplayerManager.state.selectedMapId) || MAPS[0];
+      this.elements.mapSelectionList.innerHTML = `<div class="empty-state">Room map: ${roomMap.name}. Select maps and start the match from the lobby.</div>`;
+      this.elements.mapIntroText.textContent = MultiplayerManager.state.matchStarted
+        ? "The room match is launching."
+        : "The host must pick a map and start the match from the lobby.";
+      this.elements.preMatchQuestionLink.classList.add("hidden");
       this.elements.startMatchButton.disabled = true;
     } else {
+      this.renderMapSelection();
       this.elements.mapIntroText.textContent = "Pick a battlefield before the match begins.";
-      this.elements.preMatchQuestionLink.classList.add("hidden");
+      this.elements.preMatchQuestionLink.classList.toggle("hidden", questions.length > 0);
       this.elements.startMatchButton.disabled = false;
     }
     this.elements.preMatchOverlay.classList.remove("hidden");
@@ -992,6 +994,8 @@ const MultiplayerManager = {
     hostId: "",
     players: [],
     hostQuestions: [],
+    selectedMapId: MAPS[0].id,
+    matchStarted: false,
     opponent: null,
     eventSource: null,
     lastSentHp: null,
@@ -1060,6 +1064,8 @@ const MultiplayerManager = {
       this.state.hostId = payload.hostId || "";
       this.state.hostQuestions = Array.isArray(payload.hostQuestions) ? payload.hostQuestions : [];
       this.state.players = Array.isArray(payload.players) ? payload.players : [];
+      this.state.selectedMapId = payload.selectedMapId || MAPS[0].id;
+      this.state.matchStarted = Boolean(payload.matchStarted);
       this.state.side = this.isHost() ? "host" : "player";
       this.updateOpponent();
       this.openEventStream();
@@ -1071,6 +1077,9 @@ const MultiplayerManager = {
       }
       this.reportHealth(true);
       this.reportGold(true);
+      if (this.state.matchStarted) {
+        Game.startMatch({ skipRelay: true, remoteMapId: this.state.selectedMapId });
+      }
       UIManager.setStatus(`Joined ${payload.roomId}`);
       UIManager.updateAll();
     } catch (error) {
@@ -1102,6 +1111,8 @@ const MultiplayerManager = {
       hostId: "",
       players: [],
       hostQuestions: [],
+      selectedMapId: MAPS[0].id,
+      matchStarted: false,
       opponent: null,
       eventSource: null,
       lastSentHp: null,
@@ -1123,17 +1134,23 @@ const MultiplayerManager = {
   applyRoomSnapshot(snapshot) {
     this.state.hostId = snapshot.hostId || this.state.hostId;
     this.state.players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    this.state.selectedMapId = snapshot.selectedMapId || this.state.selectedMapId;
+    this.state.matchStarted = Boolean(snapshot.matchStarted);
     this.state.side = this.isHost() ? "host" : "player";
     this.updateOpponent();
   },
   handleEvent(event) {
     if (event.type === "room_update") {
+      const wasStarted = this.state.matchStarted;
       this.applyRoomSnapshot(event);
       if (this.isHost()) {
         this.syncHostQuestions();
       } else if (Array.isArray(event.hostQuestions)) {
         this.state.hostQuestions = event.hostQuestions;
         refreshQuestionBank();
+      }
+      if (!wasStarted && this.state.matchStarted) {
+        Game.startMatch({ skipRelay: true, remoteMapId: this.state.selectedMapId });
       }
       UIManager.updateAll();
       return;
@@ -1305,17 +1322,14 @@ const Game = {
       GameState.state.currentMapId = remoteMapId;
       UIManager.renderMapSelection();
     }
+    if (!skipRelay && MultiplayerManager.state.connected && !MultiplayerManager.isHost()) {
+      UIManager.setStatus("Only the host can start the room match");
+      return;
+    }
     refreshQuestionBank();
     if (!skipRelay && MultiplayerManager.state.connected && MultiplayerManager.isHost()) {
       await MultiplayerManager.syncHostQuestions();
       refreshQuestionBank();
-    }
-    if (questions.length === 0) {
-      UIManager.showPreMatch();
-      UIManager.setStatus(MultiplayerManager.state.connected && !MultiplayerManager.isHost()
-        ? "Waiting for the host question set"
-        : "Create at least one custom question first");
-      return;
     }
     GameState.state.isPreMatch = false;
     UIManager.hidePreMatch();

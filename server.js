@@ -7,6 +7,7 @@ const { URL } = require("url");
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const MAX_ROOM_PLAYERS = 50;
+const DEFAULT_MAP_ID = "meadow-pass";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -77,7 +78,9 @@ function getOrCreateRoom(roomId) {
       hostId: "",
       hostQuestions: [],
       playerHealths: {},
-      playerGolds: {}
+      playerGolds: {},
+      selectedMapId: DEFAULT_MAP_ID,
+      matchStarted: false
     });
   }
   return rooms.get(roomId);
@@ -113,6 +116,8 @@ function buildRoomSnapshot(room) {
     roomId: room.id,
     hostId: room.hostId,
     hostQuestions: room.hostQuestions,
+    selectedMapId: room.selectedMapId,
+    matchStarted: room.matchStarted,
     players: room.players.map((player) => ({
       id: player.id,
       name: player.name,
@@ -162,6 +167,8 @@ function handleJoin(req, res, body) {
       side: existingPlayer.side,
       hostId: room.hostId,
       hostQuestions: room.hostQuestions,
+      selectedMapId: room.selectedMapId,
+      matchStarted: room.matchStarted,
       players: snapshot.players
     });
     return;
@@ -196,6 +203,8 @@ function handleJoin(req, res, body) {
     side: player.side,
     hostId: room.hostId,
     hostQuestions: room.hostQuestions,
+    selectedMapId: room.selectedMapId,
+    matchStarted: room.matchStarted,
     players: snapshot.players
   });
 }
@@ -245,6 +254,12 @@ function handleRelay(req, res, body) {
   if (body.type === "host_questions" && sender.id === room.hostId) {
     room.hostQuestions = sanitizeQuestions(payload.questions);
   }
+  if (body.type === "select_map" && sender.id === room.hostId) {
+    room.selectedMapId = String(payload.mapId || DEFAULT_MAP_ID).trim() || DEFAULT_MAP_ID;
+  }
+  if (body.type === "lobby_start" && sender.id === room.hostId) {
+    room.matchStarted = true;
+  }
   if (body.type === "health_update") {
     room.playerHealths[sender.id] = Math.max(0, Math.min(100, Number(payload.hp) || 0));
   }
@@ -267,7 +282,7 @@ function handleRelay(req, res, body) {
   }
 
   publish(room, event);
-  if (body.type === "health_update" || body.type === "gold_update") {
+  if (body.type === "health_update" || body.type === "gold_update" || body.type === "select_map" || body.type === "lobby_start") {
     publishRoom(room);
   }
   sendJson(res, 200, { ok: true });

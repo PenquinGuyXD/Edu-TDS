@@ -122,6 +122,10 @@ label span,
   margin-top: 12px;
 }
 
+.single-row {
+  grid-template-columns: 1fr;
+}
+
 .status-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 14px;
@@ -149,6 +153,38 @@ label span,
   max-height: 520px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.map-selection-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.map-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.map-card.selected {
+  border-color: rgba(83, 216, 167, 0.72);
+  background: rgba(83, 216, 167, 0.1);
+}
+
+.map-card h3,
+.map-card p {
+  margin: 0;
+}
+
+.map-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .room-player-item {
