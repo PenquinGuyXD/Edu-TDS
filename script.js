@@ -714,6 +714,7 @@ const UIManager = {
       towerShop: document.getElementById("towerShop"),
       openQuestionEditorButton: document.getElementById("openQuestionEditorButton"),
       openLobbyScreenButton: document.getElementById("openLobbyScreenButton"),
+      roomCodeBanner: document.getElementById("roomCodeBanner"),
       selectedTowerPanel: document.getElementById("selectedTowerPanel"),
       quickSellButton: document.getElementById("quickSellButton"),
       pauseButton: document.getElementById("pauseButton"),
@@ -734,7 +735,6 @@ const UIManager = {
       roomStatusValue: document.getElementById("roomStatusValue"),
       currentRoomName: document.getElementById("currentRoomName"),
       leaveRoomButton: document.getElementById("leaveRoomButton"),
-      openLobbyButton: document.getElementById("openLobbyButton"),
       multiplayerStatus: document.getElementById("multiplayerStatus"),
       playerRoleValue: document.getElementById("playerRoleValue"),
       questionSourceValue: document.getElementById("questionSourceValue"),
@@ -863,6 +863,8 @@ const UIManager = {
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
     this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
     this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
+    this.elements.roomCodeBanner.textContent = MultiplayerManager.state.connected ? `Room Code: ${MultiplayerManager.state.roomId}` : "Room Code: ----";
+    this.elements.roomCodeBanner.classList.toggle("hidden", !MultiplayerManager.state.connected);
     this.elements.playerRoleValue.textContent = MultiplayerManager.getRoleLabel();
     this.elements.questionSourceValue.textContent = MultiplayerManager.getQuestionSourceLabel();
     this.renderBoardHealth();
@@ -1278,8 +1280,18 @@ const Game = {
     document.getElementById("answerQuestionButton").addEventListener("click", () => this.askFreeQuestion());
     document.getElementById("startWaveButton").addEventListener("click", () => this.requestWaveStart());
     document.getElementById("pauseButton").addEventListener("click", () => this.togglePause());
-    document.getElementById("openQuestionEditorButton").addEventListener("click", () => window.open("questions.html", "_blank", "noopener"));
-    document.getElementById("openLobbyScreenButton").addEventListener("click", () => window.open("lobby.html", "_blank", "noopener"));
+    document.getElementById("openQuestionEditorButton").addEventListener("click", (event) => {
+      const opened = window.open("questions.html", "_blank", "noopener");
+      if (opened) {
+        event.preventDefault();
+      }
+    });
+    document.getElementById("openLobbyScreenButton").addEventListener("click", (event) => {
+      const opened = window.open("lobby.html", "_blank", "noopener");
+      if (opened) {
+        event.preventDefault();
+      }
+    });
     document.getElementById("restartButton").addEventListener("click", () => {
       if (!MultiplayerManager.canControlMatch()) {
         UIManager.setStatus("Only the host can restart a room match");
@@ -1302,9 +1314,6 @@ const Game = {
     document.getElementById("quickSellButton").addEventListener("click", () => this.sellSelectedTower());
     document.getElementById("startMatchButton").addEventListener("click", () => this.startMatch());
     document.getElementById("leaveRoomButton").addEventListener("click", () => MultiplayerManager.leaveRoom());
-    document.getElementById("openLobbyButton").addEventListener("click", () => {
-      window.location.href = "lobby.html";
-    });
     document.getElementById("sendBasicEnemyButton").addEventListener("click", () => this.requestSendEnemy("basic"));
     document.getElementById("sendFastEnemyButton").addEventListener("click", () => this.requestSendEnemy("fast"));
     document.getElementById("sendTankEnemyButton").addEventListener("click", () => this.requestSendEnemy("tank"));

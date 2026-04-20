@@ -37,6 +37,7 @@ const Lobby = {
       roomCodeInput: document.getElementById("roomCodeInput"),
       createRoomButton: document.getElementById("createRoomButton"),
       joinRoomButton: document.getElementById("joinRoomButton"),
+      startOfflineButton: document.getElementById("startOfflineButton"),
       editQuestionsButton: document.getElementById("editQuestionsButton"),
       enterGameButton: document.getElementById("enterGameButton"),
       leaveRoomButton: document.getElementById("leaveRoomButton"),
@@ -58,6 +59,7 @@ const Lobby = {
 
     this.elements.createRoomButton.addEventListener("click", () => this.createRoom());
     this.elements.joinRoomButton.addEventListener("click", () => this.joinRoom());
+    this.elements.startOfflineButton.addEventListener("click", () => this.startOfflineGame());
     this.elements.editQuestionsButton.addEventListener("click", () => window.open("questions.html", "_blank", "noopener"));
     this.elements.enterGameButton.addEventListener("click", () => this.enterGame());
     this.elements.leaveRoomButton.addEventListener("click", () => this.leaveRoom());
@@ -145,7 +147,7 @@ const Lobby = {
     this.elements.editQuestionsButton.disabled = !this.isHost();
     this.elements.enterGameButton.disabled = !this.state.connected || (!this.isHost() && !this.state.matchStarted);
     this.elements.leaveRoomButton.disabled = !this.state.connected;
-    this.elements.createRoomButton.disabled = this.state.connected;
+    this.elements.createRoomButton.disabled = false;
     this.elements.joinRoomButton.disabled = this.state.connected;
     this.renderPlayers();
     this.renderMaps();
@@ -157,13 +159,18 @@ const Lobby = {
     this.state.matchStarted = Boolean(snapshot.matchStarted);
   },
   async createRoom() {
-    this.clearSession();
+    const name = String(this.elements.playerNameInput.value).trim() || "Player";
+    const roomId = `room-${Math.random().toString(36).slice(2, 6)}`;
+
     if (this.state.connected) {
       await this.leaveRoom();
+    } else {
+      this.clearSession();
     }
+
     this.state.navigatingToGame = false;
-    this.elements.roomCodeInput.value = `room-${Math.random().toString(36).slice(2, 6)}`;
-    await this.joinRoom();
+    this.elements.roomCodeInput.value = roomId;
+    await this.joinRoom({ roomId, name, playerId: "" });
   },
   async joinRoom(override = null) {
     const saved = override || {};
@@ -261,6 +268,15 @@ const Lobby = {
     };
     this.clearSession();
     this.updateUI();
+  },
+  async startOfflineGame() {
+    if (this.state.connected) {
+      await this.leaveRoom();
+    } else {
+      this.clearSession();
+    }
+    this.state.navigatingToGame = true;
+    window.location.href = "index.html";
   },
   async enterGame(fromAuto = false) {
     if (!this.state.connected) return;
