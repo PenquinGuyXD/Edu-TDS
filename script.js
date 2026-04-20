@@ -224,6 +224,9 @@ const GameState = {
   },
   canInteract() {
     return !this.state.isGameOver && !this.state.isQuestionOpen && !this.state.isRestartModalOpen && !this.state.isPreMatch;
+  },
+  questionPausesGameplay() {
+    return !MultiplayerManager.state.connected;
   }
 };
 
@@ -633,7 +636,7 @@ const QuestionManager = {
     if (typeof UIManager !== "undefined" && UIManager.hideQuestionModal) UIManager.hideQuestionModal();
   },
   ask(context, callback) {
-    // Question system: modal pauses gameplay and gates question-based rewards, towers, and abilities.
+    // Question system: modal gates rewards, towers, and abilities. It only freezes gameplay in singleplayer.
     if (GameState.state.isGameOver || GameState.state.isQuestionOpen) return false;
     if (questions.length === 0) {
       UIManager.setStatus("Create custom questions in the editor first");
@@ -837,6 +840,7 @@ const UIManager = {
     refreshQuestionBank();
     const { hp, gold, wave, isPaused, isGameOver, waveInProgress, abilityCooldowns, pendingPlacement } = GameState.state;
     const actionLocked = !GameState.canInteract() || Boolean(pendingPlacement);
+    const hostControlLocked = !MultiplayerManager.canControlMatch();
     if (this.elements.hpValue) this.elements.hpValue.textContent = hp;
     this.elements.goldValue.textContent = gold;
     this.elements.waveValue.textContent = wave;
@@ -854,6 +858,8 @@ const UIManager = {
     this.elements.sendFastEnemyButton.disabled = raidLocked;
     this.elements.sendTankEnemyButton.disabled = raidLocked;
     this.elements.leaveRoomButton.disabled = !MultiplayerManager.state.connected;
+    this.elements.pauseButton.disabled = hostControlLocked || GameState.state.isQuestionOpen || GameState.state.isGameOver;
+    this.elements.restartButton.disabled = hostControlLocked || GameState.state.isQuestionOpen;
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
     this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
     this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
@@ -1019,6 +1025,9 @@ const MultiplayerManager = {
   getRoleLabel() {
     if (!this.state.connected) return "Solo";
     return this.isHost() ? "Host" : "Player";
+  },
+  canControlMatch() {
+    return !this.state.connected || this.isHost();
   },
   getQuestionSourceLabel() {
     if (!this.state.connected) return questions.length ? "Local custom set" : "No questions";
@@ -1272,9 +1281,17 @@ const Game = {
     document.getElementById("openQuestionEditorButton").addEventListener("click", () => window.open("questions.html", "_blank", "noopener"));
     document.getElementById("openLobbyScreenButton").addEventListener("click", () => window.open("lobby.html", "_blank", "noopener"));
     document.getElementById("restartButton").addEventListener("click", () => {
+      if (!MultiplayerManager.canControlMatch()) {
+        UIManager.setStatus("Only the host can restart a room match");
+        return;
+      }
       if (!GameState.state.isQuestionOpen) UIManager.showRestartModal();
     });
     document.getElementById("confirmRestartButton").addEventListener("click", () => {
+      if (!MultiplayerManager.canControlMatch()) {
+        UIManager.setStatus("Only the host can restart a room match");
+        return;
+      }
       GameState.reset();
       UIManager.setStatus("Run restarted");
     });
@@ -1472,13 +1489,23 @@ const Game = {
     UIManager.updateAll();
   },
   togglePause() {
+    if (!MultiplayerManager.canControlMatch()) {
+      UIManager.setStatus("Only the host can pause a room match");
+      return;
+    }
     if (GameState.state.isGameOver || GameState.state.isQuestionOpen) return;
     GameState.state.isPaused = !GameState.state.isPaused;
     UIManager.setStatus(GameState.state.isPaused ? "Paused" : "Battle resumed");
     UIManager.updateAll();
   },
   update(deltaTime) {
-    if (GameState.state.isPaused || GameState.state.isQuestionOpen || GameState.state.isGameOver || GameState.state.isRestartModalOpen || GameState.state.isPreMatch) return;
+    if (
+      GameState.state.isPaused ||
+      (GameState.state.isQuestionOpen && GameState.questionPausesGameplay()) ||
+      GameState.state.isGameOver ||
+      GameState.state.isRestartModalOpen ||
+      GameState.state.isPreMatch
+    ) return;
     if (GameState.state.freezeRemaining > 0) GameState.state.freezeRemaining = Math.max(0, GameState.state.freezeRemaining - deltaTime);
     Object.keys(GameState.state.abilityCooldowns).forEach((key) => {
       GameState.state.abilityCooldowns[key] = Math.max(0, GameState.state.abilityCooldowns[key] - deltaTime);
