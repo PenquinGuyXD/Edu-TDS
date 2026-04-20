@@ -26,7 +26,7 @@
               <p>The battlefield is on hold.</p>
             </div>
           </div>
-      <div id="gameOverOverlay" class="overlay hidden">
+          <div id="gameOverOverlay" class="overlay hidden">
             <div class="overlay-card">
               <h2>Base Lost</h2>
               <p id="gameOverSummary">Your scholars fought bravely.</p>
@@ -37,6 +37,7 @@
             <div class="overlay-card pre-match-card">
               <h2>Choose Your Map</h2>
               <p id="mapIntroText">Pick a battlefield before the match begins.</p>
+              <a id="preMatchQuestionLink" href="questions.html" class="secondary-button panel-link-button hidden">Create Custom Questions</a>
               <div id="mapSelectionList" class="map-selection-list"></div>
               <button id="startMatchButton" class="primary-button">Start Match</button>
             </div>
@@ -102,10 +103,12 @@
             <p>Learn, defend, and survive.</p>
           </div>
           <ul class="info-list">
+            <li>Only your custom-made questions are used in the game.</li>
             <li>Correct answers earn gold and activate tower and ability purchases.</li>
             <li>Farm Towers boost question rewards for the whole run.</li>
             <li>Sniper Towers hit hard across nearly the whole map.</li>
             <li>Starting a wave no longer needs a question prompt.</li>
+            <li>Sending raid enemies now only costs gold and no longer asks a question.</li>
             <li>Each new match begins with a map selection.</li>
             <li>If an enemy reaches the base, you lose HP equal to its remaining health.</li>
           </ul>
@@ -113,11 +116,22 @@
       </aside>
     </main>
 
+    <section class="versus-strip">
+      <div class="versus-card">
+        <span>Your Health</span>
+        <strong id="playerHealthMirror">100</strong>
+      </div>
+      <div class="versus-card">
+        <span>Opponent Health</span>
+        <strong id="opponentHealthValue">Multiplayer only</strong>
+      </div>
+    </section>
+
     <section class="multiplayer-section">
       <div class="multiplayer-panel">
         <div class="panel-header">
-          <h2>1v1 Multiplayer</h2>
-          <p>Join a room, share your screen, and send pressure to your opponent.</p>
+          <h2>Multiplayer Lobby</h2>
+          <p>The first player in the room becomes the host and shares their custom question set with everyone else.</p>
         </div>
         <div class="multiplayer-grid">
           <div class="multiplayer-card">
@@ -127,7 +141,7 @@
               <input id="roomCodeInput" type="text" maxlength="16" placeholder="Room code">
             </div>
             <div class="button-grid">
-              <button id="joinRoomButton" class="primary-button">Join 1v1 Room</button>
+              <button id="joinRoomButton" class="primary-button">Join Room</button>
               <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
             </div>
             <div class="multiplayer-status-list">
@@ -135,22 +149,31 @@
               <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
               <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
               <div><span>Opponent</span><strong id="opponentStatusValue">Waiting</strong></div>
+              <div><span>Question Set</span><strong id="questionSourceValue">No questions</strong></div>
             </div>
           </div>
 
           <div class="multiplayer-card">
-            <h3>Screen Share</h3>
-            <p class="multiplayer-copy">Share your board and scroll down to watch the opponent stream below.</p>
-            <div class="button-grid">
-              <button id="shareScreenButton" class="secondary-button" disabled>Share Screen</button>
-              <button id="stopShareButton" class="danger-button" disabled>Stop Share</button>
+            <h3>Waiting Room</h3>
+            <div class="waiting-room-head">
+              <div class="waiting-room-stat">
+                <span>Room Code</span>
+                <strong id="waitingRoomCode">Use the room field above</strong>
+              </div>
+              <div class="waiting-room-stat">
+                <span>Players</span>
+                <strong id="roomPopulationValue">0/50</strong>
+              </div>
             </div>
-            <video id="localPreview" class="screen-preview" autoplay muted playsinline></video>
+            <p class="multiplayer-copy">Players in the room are listed here live. The first player shown is the current host.</p>
+            <ul id="roomPlayerList" class="room-player-list">
+              <li class="room-player-empty">No one is in the waiting room yet.</li>
+            </ul>
           </div>
 
           <div class="multiplayer-card">
             <h3>Send Enemies</h3>
-            <p class="multiplayer-copy">Spend gold and answer correctly to spawn enemies on the opponent side.</p>
+            <p class="multiplayer-copy">Spend gold to spawn pressure on the other side instantly.</p>
             <div class="enemy-send-grid">
               <button id="sendBasicEnemyButton" class="secondary-button" disabled>Send Scout Rush</button>
               <button id="sendFastEnemyButton" class="secondary-button" disabled>Send Speedsters</button>
@@ -163,14 +186,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="multiplayer-panel opponent-panel">
-        <div class="panel-header">
-          <h2>Opponent Screen</h2>
-          <p>Scroll down here anytime to watch the other player’s live board.</p>
-        </div>
-        <video id="remoteScreen" class="remote-screen" autoplay playsinline controls></video>
       </div>
     </section>
   </div>
