@@ -245,6 +245,7 @@ class Enemy {
     this.x = path[0].x;
     this.y = path[0].y;
     this.isAlive = true;
+    this.senderName = config.senderName || "";
   }
 
   update(deltaTime) {
@@ -322,6 +323,15 @@ class Enemy {
     ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 12, barWidth, 6);
     ctx.fillStyle = "#57e389";
     ctx.fillRect(this.x - barWidth / 2, this.y - this.radius - 12, barWidth * healthRatio, 6);
+
+    if (this.senderName) {
+      ctx.fillStyle = "rgba(4, 8, 15, 0.72)";
+      ctx.fillRect(this.x - 46, this.y - this.radius - 28, 92, 12);
+      ctx.fillStyle = "#ffcf5d";
+      ctx.font = "bold 10px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(this.senderName, this.x, this.y - this.radius - 18);
+    }
     ctx.restore();
   }
 }
@@ -976,9 +986,15 @@ const UIManager = {
       this.elements.mapSelectionList.innerHTML = `<div class="empty-state">Room map: ${roomMap.name}. Select maps and start the match from the lobby.</div>`;
       this.elements.mapIntroText.textContent = MultiplayerManager.state.matchStarted
         ? "The room match is launching."
-        : "The host must pick a map and start the match from the lobby.";
+        : (MultiplayerManager.isHost()
+          ? `Room map is ${roomMap.name}. Start the room match here or from the lobby.`
+          : "Waiting for the host to start the room match.");
       this.elements.preMatchQuestionLink.classList.add("hidden");
-      this.elements.startMatchButton.disabled = true;
+      this.elements.startMatchButton.disabled = !MultiplayerManager.isHost();
+      if (MultiplayerManager.state.matchStarted) {
+        this.hidePreMatch();
+        return;
+      }
     } else {
       this.renderMapSelection();
       this.elements.mapIntroText.textContent = "Pick a battlefield before the match begins.";
@@ -1184,7 +1200,7 @@ const MultiplayerManager = {
 
     if (event.type === "send_enemy") {
       if (event.sender !== this.state.playerId) {
-        Game.spawnIncomingRaid(event.payload.kind);
+        Game.spawnIncomingRaid(event.payload.kind, event.payload.senderName);
         UIManager.setStatus(`${event.payload.label} incoming from ${event.payload.senderName || "opponent"}`);
       }
       return;
@@ -1352,6 +1368,10 @@ const Game = {
       UIManager.setStatus("Only the host can start the room match");
       return;
     }
+    if (MultiplayerManager.state.connected) {
+      GameState.state.currentMapId = MultiplayerManager.state.selectedMapId || GameState.state.currentMapId;
+      UIManager.renderMapSelection();
+    }
     refreshQuestionBank();
     if (!skipRelay && MultiplayerManager.state.connected && MultiplayerManager.isHost()) {
       await MultiplayerManager.syncHostQuestions();
@@ -1466,11 +1486,11 @@ const Game = {
     UIManager.setStatus(`${tower.name} sold`);
     UIManager.updateAll();
   },
-  spawnIncomingRaid(kind) {
+  spawnIncomingRaid(kind, senderName = "") {
     const entry = multiplayerEnemyCatalog[kind];
     if (!entry) return;
     for (let i = 0; i < entry.count; i += 1) {
-      GameState.state.enemies.push(new Enemy(buildRaidEnemy(kind, i)));
+      GameState.state.enemies.push(new Enemy(buildRaidEnemy(kind, i, senderName)));
     }
   },
   requestAbility(type) {
@@ -1622,7 +1642,7 @@ function drawPath(ctx) {
   ctx.restore();
 }
 
-function buildRaidEnemy(kind, index) {
+function buildRaidEnemy(kind, index, senderName = "") {
   const wave = Math.max(1, GameState.state.wave || 1);
   const offset = index * 16;
   if (kind === "fast") {
@@ -1632,7 +1652,8 @@ function buildRaidEnemy(kind, index) {
       speed: 112 + wave * 2.5 + offset,
       reward: 10 + wave,
       color: "#ffd84a",
-      radius: 13
+      radius: 13,
+      senderName
     };
   }
   if (kind === "tank") {
@@ -1642,7 +1663,8 @@ function buildRaidEnemy(kind, index) {
       speed: 42 + wave * 1.3,
       reward: 20 + wave * 2,
       color: "#ff6b6b",
-      radius: 20
+      radius: 20,
+      senderName
     };
   }
   return {
@@ -1651,7 +1673,8 @@ function buildRaidEnemy(kind, index) {
     speed: 72 + wave * 1.7 + offset,
     reward: 8 + wave,
     color: "#59a6ff",
-    radius: 16
+    radius: 16,
+    senderName
   };
 }
 
