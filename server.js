@@ -76,7 +76,8 @@ function getOrCreateRoom(roomId) {
       streams: new Map(),
       hostId: "",
       hostQuestions: [],
-      playerHealths: {}
+      playerHealths: {},
+      playerGolds: {}
     });
   }
   return rooms.get(roomId);
@@ -100,6 +101,9 @@ function normalizeRoom(room) {
     if (typeof room.playerHealths[player.id] !== "number") {
       room.playerHealths[player.id] = 100;
     }
+    if (typeof room.playerGolds[player.id] !== "number") {
+      room.playerGolds[player.id] = 120;
+    }
   });
 }
 
@@ -113,7 +117,8 @@ function buildRoomSnapshot(room) {
       id: player.id,
       name: player.name,
       side: player.side,
-      hp: typeof room.playerHealths[player.id] === "number" ? room.playerHealths[player.id] : null
+      hp: typeof room.playerHealths[player.id] === "number" ? room.playerHealths[player.id] : null,
+      gold: typeof room.playerGolds[player.id] === "number" ? room.playerGolds[player.id] : null
     }))
   };
 }
@@ -135,12 +140,33 @@ function publishRoom(room) {
 function handleJoin(req, res, body) {
   const roomId = String(body.roomId || "").trim().toLowerCase();
   const name = String(body.name || "Player").trim().slice(0, 24) || "Player";
+  const requestedPlayerId = String(body.playerId || "").trim();
   if (!roomId) {
     sendJson(res, 400, { error: "Room code is required." });
     return;
   }
 
   const room = getOrCreateRoom(roomId);
+  const existingPlayer = requestedPlayerId ? getPlayer(room, requestedPlayerId) : null;
+  if (existingPlayer) {
+    existingPlayer.name = name;
+    if (existingPlayer.id === room.hostId) {
+      room.hostQuestions = sanitizeQuestions(body.questions);
+    }
+    normalizeRoom(room);
+    const snapshot = buildRoomSnapshot(room);
+    publishRoom(room);
+    sendJson(res, 200, {
+      roomId,
+      playerId: existingPlayer.id,
+      side: existingPlayer.side,
+      hostId: room.hostId,
+      hostQuestions: room.hostQuestions,
+      players: snapshot.players
+    });
+    return;
+  }
+
   if (room.players.length >= MAX_ROOM_PLAYERS) {
     sendJson(res, 409, { error: "Room is full." });
     return;
@@ -154,6 +180,7 @@ function handleJoin(req, res, body) {
 
   room.players.push(player);
   room.playerHealths[player.id] = 100;
+  room.playerGolds[player.id] = 120;
   if (room.players.length === 1) {
     room.hostId = player.id;
     room.hostQuestions = sanitizeQuestions(body.questions);
@@ -182,6 +209,7 @@ function handleLeave(req, res, body) {
 
   room.players = room.players.filter((player) => player.id !== body.playerId);
   delete room.playerHealths[body.playerId];
+  delete room.playerGolds[body.playerId];
 
   const stream = room.streams.get(body.playerId);
   if (stream) {
@@ -220,6 +248,9 @@ function handleRelay(req, res, body) {
   if (body.type === "health_update") {
     room.playerHealths[sender.id] = Math.max(0, Math.min(100, Number(payload.hp) || 0));
   }
+  if (body.type === "gold_update") {
+    room.playerGolds[sender.id] = Math.max(0, Math.round(Number(payload.gold) || 0));
+  }
 
   const event = {
     type: body.type,
@@ -236,7 +267,7 @@ function handleRelay(req, res, body) {
   }
 
   publish(room, event);
-  if (body.type === "health_update") {
+  if (body.type === "health_update" || body.type === "gold_update") {
     publishRoom(room);
   }
   sendJson(res, 200, { ok: true });

@@ -9,12 +9,15 @@
 <body>
   <div class="app-shell">
     <header class="top-bar">
-      <div class="stat-card"><span class="stat-label">HP</span><strong id="hpValue">100</strong></div>
       <div class="stat-card"><span class="stat-label">Gold</span><strong id="goldValue">120</strong></div>
       <div class="stat-card"><span class="stat-label">Wave</span><strong id="waveValue">0</strong></div>
       <div class="stat-card"><span class="stat-label">Gold Multiplier</span><strong id="multiplierValue">1.00x</strong></div>
       <div class="stat-card"><span class="stat-label">Status</span><strong id="statusValue">Ready</strong></div>
     </header>
+    <div class="top-shortcuts">
+      <button id="openQuestionEditorButton" class="secondary-button">Open Question Editor</button>
+      <button id="openLobbyScreenButton" class="secondary-button">Open Lobby Screen</button>
+    </div>
 
     <main class="main-layout">
       <section class="playfield-panel">
@@ -43,6 +46,15 @@
             </div>
           </div>
         </div>
+        <section class="board-health-panel">
+          <div class="panel-header">
+            <h2>Room Health</h2>
+            <p>Everyone currently in the room appears here with live health.</p>
+          </div>
+          <ul id="boardHealthList" class="board-health-list">
+            <li class="board-health-empty">Join a room from the lobby to see everyone's health here.</li>
+          </ul>
+        </section>
       </section>
 
       <aside class="sidebar">
@@ -116,59 +128,31 @@
       </aside>
     </main>
 
-    <section class="versus-strip">
-      <div class="versus-card">
-        <span>Your Health</span>
-        <strong id="playerHealthMirror">100</strong>
-      </div>
-      <div class="versus-card">
-        <span>Opponent Health</span>
-        <strong id="opponentHealthValue">Multiplayer only</strong>
-      </div>
-    </section>
-
     <section class="multiplayer-section">
       <div class="multiplayer-panel">
         <div class="panel-header">
-          <h2>Multiplayer Lobby</h2>
-          <p>The first player in the room becomes the host and shares their custom question set with everyone else.</p>
+          <h2>Room Controls</h2>
+          <p>Use the separate lobby screen to create a room, see the roster, and then jump into the match.</p>
         </div>
         <div class="multiplayer-grid">
           <div class="multiplayer-card">
-            <h3>Room Setup</h3>
-            <div class="multiplayer-form">
-              <input id="playerNameInput" type="text" maxlength="24" placeholder="Your name">
-              <input id="roomCodeInput" type="text" maxlength="16" placeholder="Room code">
-            </div>
+            <h3>Current Session</h3>
             <div class="button-grid">
-              <button id="joinRoomButton" class="primary-button">Join Room</button>
+              <button id="openLobbyButton" class="primary-button">Open Lobby</button>
               <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
             </div>
             <div class="multiplayer-status-list">
-              <div><span>Status</span><strong id="multiplayerStatus">Offline</strong></div>
-              <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
+              <div><span>Connection</span><strong id="multiplayerStatus">Offline</strong></div>
+              <div><span>Status</span><strong id="roomStatusValue">No Room</strong></div>
+              <div><span>Room</span><strong id="currentRoomName">Open Lobby</strong></div>
               <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
-              <div><span>Opponent</span><strong id="opponentStatusValue">Waiting</strong></div>
               <div><span>Question Set</span><strong id="questionSourceValue">No questions</strong></div>
             </div>
           </div>
 
           <div class="multiplayer-card">
-            <h3>Waiting Room</h3>
-            <div class="waiting-room-head">
-              <div class="waiting-room-stat">
-                <span>Room Code</span>
-                <strong id="waitingRoomCode">Use the room field above</strong>
-              </div>
-              <div class="waiting-room-stat">
-                <span>Players</span>
-                <strong id="roomPopulationValue">0/50</strong>
-              </div>
-            </div>
-            <p class="multiplayer-copy">Players in the room are listed here live. The first player shown is the current host.</p>
-            <ul id="roomPlayerList" class="room-player-list">
-              <li class="room-player-empty">No one is in the waiting room yet.</li>
-            </ul>
+            <h3>Question Ownership</h3>
+            <p class="multiplayer-copy">The first player to join becomes the host. Everyone in that room uses the host's custom question bank, and when the host starts the match the whole room starts together.</p>
           </div>
 
           <div class="multiplayer-card">

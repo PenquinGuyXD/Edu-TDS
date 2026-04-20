@@ -1,4 +1,5 @@
 const CUSTOM_QUESTIONS_KEY = "scholar-siege-custom-questions";
+const MULTIPLAYER_SESSION_KEY = "scholar-siege-room-session";
 
 function getCustomQuestions() {
   try {
@@ -16,6 +17,26 @@ function loadQuestionBank() {
 }
 
 let questions = loadQuestionBank();
+
+function loadMultiplayerSession() {
+  try {
+    const raw = sessionStorage.getItem(MULTIPLAYER_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.roomId || !parsed.name) return null;
+    return parsed;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveMultiplayerSession(session) {
+  sessionStorage.setItem(MULTIPLAYER_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearMultiplayerSession() {
+  sessionStorage.removeItem(MULTIPLAYER_SESSION_KEY);
+}
 
 function refreshQuestionBank() {
   if (typeof MultiplayerManager !== "undefined" && MultiplayerManager.state.connected) {
@@ -165,6 +186,7 @@ const GameState = {
       isRestartModalOpen: false,
       isPreMatch: true,
       waveInProgress: false,
+      autoWaveCountdown: 0,
       questionGate: null,
       lastTime: 0,
       freezeRemaining: 0,
@@ -182,6 +204,7 @@ const GameState = {
     UIManager.showPreMatch();
     UIManager.updateAll();
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportHealth(true);
+    if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportGold(true);
   },
   getFarmMultiplier() {
     // Economy system: only questions and enemy kills create gold.
@@ -192,10 +215,12 @@ const GameState = {
   spendGold(amount) {
     if (this.state.gold < amount) return false;
     this.state.gold -= amount;
+    if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportGold(true);
     return true;
   },
   addGold(amount) {
     this.state.gold += Math.round(amount);
+    if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportGold(true);
   },
   canInteract() {
     return !this.state.isGameOver && !this.state.isQuestionOpen && !this.state.isRestartModalOpen && !this.state.isPreMatch;
@@ -684,6 +709,8 @@ const UIManager = {
       multiplierValue: document.getElementById("multiplierValue"),
       statusValue: document.getElementById("statusValue"),
       towerShop: document.getElementById("towerShop"),
+      openQuestionEditorButton: document.getElementById("openQuestionEditorButton"),
+      openLobbyScreenButton: document.getElementById("openLobbyScreenButton"),
       selectedTowerPanel: document.getElementById("selectedTowerPanel"),
       quickSellButton: document.getElementById("quickSellButton"),
       pauseButton: document.getElementById("pauseButton"),
@@ -701,20 +728,14 @@ const UIManager = {
       startMatchButton: document.getElementById("startMatchButton"),
       mapIntroText: document.getElementById("mapIntroText"),
       preMatchQuestionLink: document.getElementById("preMatchQuestionLink"),
-      playerNameInput: document.getElementById("playerNameInput"),
-      roomCodeInput: document.getElementById("roomCodeInput"),
-      joinRoomButton: document.getElementById("joinRoomButton"),
+      roomStatusValue: document.getElementById("roomStatusValue"),
+      currentRoomName: document.getElementById("currentRoomName"),
       leaveRoomButton: document.getElementById("leaveRoomButton"),
+      openLobbyButton: document.getElementById("openLobbyButton"),
       multiplayerStatus: document.getElementById("multiplayerStatus"),
-      currentRoomValue: document.getElementById("currentRoomValue"),
-      waitingRoomCode: document.getElementById("waitingRoomCode"),
       playerRoleValue: document.getElementById("playerRoleValue"),
-      opponentStatusValue: document.getElementById("opponentStatusValue"),
-      roomPopulationValue: document.getElementById("roomPopulationValue"),
-      roomPlayerList: document.getElementById("roomPlayerList"),
       questionSourceValue: document.getElementById("questionSourceValue"),
-      playerHealthMirror: document.getElementById("playerHealthMirror"),
-      opponentHealthValue: document.getElementById("opponentHealthValue"),
+      boardHealthList: document.getElementById("boardHealthList"),
       sendBasicEnemyButton: document.getElementById("sendBasicEnemyButton"),
       sendFastEnemyButton: document.getElementById("sendFastEnemyButton"),
       sendTankEnemyButton: document.getElementById("sendTankEnemyButton"),
@@ -728,7 +749,7 @@ const UIManager = {
     };
     this.renderTowerShop();
     this.renderMapSelection();
-    this.renderRoomPlayers();
+    this.renderBoardHealth();
     this.updateAll();
   },
   renderMapSelection() {
@@ -784,21 +805,21 @@ const UIManager = {
       this.elements.towerShop.appendChild(card);
     });
   },
-  renderRoomPlayers() {
-    const list = this.elements.roomPlayerList;
+  renderBoardHealth() {
+    const list = this.elements.boardHealthList;
     if (!list) return;
     const players = MultiplayerManager.state.players;
     list.innerHTML = "";
-    if (!players.length) {
+    if (!MultiplayerManager.state.connected || !players.length) {
       const item = document.createElement("li");
-      item.className = "room-player-empty";
-      item.textContent = "No one is in the waiting room yet.";
+      item.className = "board-health-empty";
+      item.textContent = "Join a room from the lobby to see everyone's health here.";
       list.appendChild(item);
       return;
     }
     players.forEach((player) => {
       const item = document.createElement("li");
-      item.className = "room-player-item";
+      item.className = "board-health-item";
       const role = player.id === MultiplayerManager.state.hostId ? "Host" : "Player";
       const hp = typeof player.hp === "number" ? `${player.hp} HP` : "Waiting";
       item.innerHTML = `
@@ -812,16 +833,14 @@ const UIManager = {
     });
   },
   updateAll() {
-    if (!this.elements.hpValue) return;
+    if (!this.elements.statusValue) return;
     refreshQuestionBank();
     const { hp, gold, wave, isPaused, isGameOver, waveInProgress, abilityCooldowns, pendingPlacement } = GameState.state;
     const actionLocked = !GameState.canInteract() || Boolean(pendingPlacement);
-    this.elements.hpValue.textContent = hp;
+    if (this.elements.hpValue) this.elements.hpValue.textContent = hp;
     this.elements.goldValue.textContent = gold;
     this.elements.waveValue.textContent = wave;
     this.elements.multiplierValue.textContent = `${GameState.getFarmMultiplier().toFixed(2)}x`;
-    this.elements.playerHealthMirror.textContent = hp;
-    this.elements.opponentHealthValue.textContent = MultiplayerManager.getOpponentHealthLabel();
     this.elements.pauseButton.textContent = isPaused ? "Resume" : "Pause";
     this.elements.pausedOverlay.classList.toggle("hidden", !isPaused || isGameOver);
     this.elements.startMatchButton.disabled = questions.length === 0;
@@ -834,16 +853,13 @@ const UIManager = {
     this.elements.sendBasicEnemyButton.disabled = raidLocked;
     this.elements.sendFastEnemyButton.disabled = raidLocked;
     this.elements.sendTankEnemyButton.disabled = raidLocked;
-    this.elements.joinRoomButton.disabled = MultiplayerManager.state.connected;
     this.elements.leaveRoomButton.disabled = !MultiplayerManager.state.connected;
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
-    this.elements.currentRoomValue.textContent = MultiplayerManager.state.roomId || "None";
-    this.elements.waitingRoomCode.textContent = MultiplayerManager.state.roomId || this.elements.roomCodeInput.value.trim() || "Use the room field above";
+    this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
+    this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
     this.elements.playerRoleValue.textContent = MultiplayerManager.getRoleLabel();
-    this.elements.opponentStatusValue.textContent = MultiplayerManager.state.opponent ? MultiplayerManager.state.opponent.name : "Waiting";
-    this.elements.roomPopulationValue.textContent = `${MultiplayerManager.state.players.length}/50`;
     this.elements.questionSourceValue.textContent = MultiplayerManager.getQuestionSourceLabel();
-    this.renderRoomPlayers();
+    this.renderBoardHealth();
     this.elements.towerShop.querySelectorAll("button").forEach((button) => {
       button.disabled = actionLocked;
     });
@@ -978,12 +994,16 @@ const MultiplayerManager = {
     hostQuestions: [],
     opponent: null,
     eventSource: null,
-    lastSentHp: null
+    lastSentHp: null,
+    lastSentGold: null
   },
   init() {
-    const suggestedRoom = `room-${Math.random().toString(36).slice(2, 6)}`;
-    UIManager.elements.roomCodeInput.value = suggestedRoom;
-    UIManager.elements.playerNameInput.value = `Player-${Math.random().toString(36).slice(2, 5)}`;
+    const session = loadMultiplayerSession();
+    if (session) {
+      this.joinRoom(session);
+      return;
+    }
+    UIManager.setStatus("Open the lobby to join a room");
   },
   apiPath(path) {
     if (window.location.protocol.startsWith("http")) return path;
@@ -1014,18 +1034,20 @@ const MultiplayerManager = {
   canSendRaid() {
     return this.state.connected && Boolean(this.state.opponent);
   },
-  async joinRoom() {
-    const roomId = UIManager.elements.roomCodeInput.value.trim().toLowerCase();
-    const name = UIManager.elements.playerNameInput.value.trim() || "Player";
+  async joinRoom(sessionOverride = null) {
+    const session = sessionOverride || loadMultiplayerSession();
+    const roomId = String(session?.roomId || "").trim().toLowerCase();
+    const name = String(session?.name || "Player").trim() || "Player";
+    const playerId = String(session?.playerId || "").trim();
     if (!roomId) {
-      UIManager.setStatus("Enter a room code");
+      UIManager.setStatus("Open the lobby to join a room");
       return;
     }
     try {
       const response = await fetch(this.apiPath("/join"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId, name, questions: getCustomQuestions() })
+        body: JSON.stringify({ roomId, name, playerId, questions: getCustomQuestions() })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -1041,12 +1063,14 @@ const MultiplayerManager = {
       this.state.side = this.isHost() ? "host" : "player";
       this.updateOpponent();
       this.openEventStream();
+      saveMultiplayerSession({ roomId: payload.roomId, name, playerId: payload.playerId });
       if (this.isHost()) {
         await this.syncHostQuestions();
       } else {
         refreshQuestionBank();
       }
       this.reportHealth(true);
+      this.reportGold(true);
       UIManager.setStatus(`Joined ${payload.roomId}`);
       UIManager.updateAll();
     } catch (error) {
@@ -1061,6 +1085,7 @@ const MultiplayerManager = {
       body: JSON.stringify({ roomId: this.state.roomId, playerId: this.state.playerId })
     }).catch(() => {});
     this.resetConnectionState();
+    clearMultiplayerSession();
     refreshQuestionBank();
     UIManager.setStatus("Left multiplayer room");
     UIManager.updateAll();
@@ -1079,7 +1104,8 @@ const MultiplayerManager = {
       hostQuestions: [],
       opponent: null,
       eventSource: null,
-      lastSentHp: null
+      lastSentHp: null,
+      lastSentGold: null
     };
   },
   openEventStream() {
@@ -1180,10 +1206,11 @@ const MultiplayerManager = {
   async sendRaid(kind) {
     const entry = multiplayerEnemyCatalog[kind];
     if (!entry || !this.state.opponent) return;
+    const currentPlayer = this.state.players.find((player) => player.id === this.state.playerId);
     await this.relay("send_enemy", {
       kind,
       label: entry.label,
-      senderName: UIManager.elements.playerNameInput.value.trim() || "Player"
+      senderName: currentPlayer?.name || "Player"
     }, this.state.opponent.id);
   },
   reportHealth(force = false) {
@@ -1191,6 +1218,12 @@ const MultiplayerManager = {
     if (!force && this.state.lastSentHp === GameState.state.hp) return;
     this.state.lastSentHp = GameState.state.hp;
     this.relay("health_update", { hp: GameState.state.hp });
+  },
+  reportGold(force = false) {
+    if (!this.state.connected) return;
+    if (!force && this.state.lastSentGold === GameState.state.gold) return;
+    this.state.lastSentGold = GameState.state.gold;
+    this.relay("gold_update", { gold: GameState.state.gold });
   }
 };
 
@@ -1212,6 +1245,8 @@ const Game = {
     document.getElementById("answerQuestionButton").addEventListener("click", () => this.askFreeQuestion());
     document.getElementById("startWaveButton").addEventListener("click", () => this.requestWaveStart());
     document.getElementById("pauseButton").addEventListener("click", () => this.togglePause());
+    document.getElementById("openQuestionEditorButton").addEventListener("click", () => window.open("questions.html", "_blank", "noopener"));
+    document.getElementById("openLobbyScreenButton").addEventListener("click", () => window.open("lobby.html", "_blank", "noopener"));
     document.getElementById("restartButton").addEventListener("click", () => {
       if (!GameState.state.isQuestionOpen) UIManager.showRestartModal();
     });
@@ -1225,8 +1260,10 @@ const Game = {
     document.getElementById("freezeButton").addEventListener("click", () => this.requestAbility("freeze"));
     document.getElementById("quickSellButton").addEventListener("click", () => this.sellSelectedTower());
     document.getElementById("startMatchButton").addEventListener("click", () => this.startMatch());
-    document.getElementById("joinRoomButton").addEventListener("click", () => MultiplayerManager.joinRoom());
     document.getElementById("leaveRoomButton").addEventListener("click", () => MultiplayerManager.leaveRoom());
+    document.getElementById("openLobbyButton").addEventListener("click", () => {
+      window.location.href = "lobby.html";
+    });
     document.getElementById("sendBasicEnemyButton").addEventListener("click", () => this.requestSendEnemy("basic"));
     document.getElementById("sendFastEnemyButton").addEventListener("click", () => this.requestSendEnemy("fast"));
     document.getElementById("sendTankEnemyButton").addEventListener("click", () => this.requestSendEnemy("tank"));
@@ -1275,16 +1312,19 @@ const Game = {
     }
     GameState.state.isPreMatch = false;
     UIManager.hidePreMatch();
+    if (MultiplayerManager.state.connected) GameState.state.autoWaveCountdown = 2.5;
     if (!skipRelay && MultiplayerManager.state.connected) {
       await MultiplayerManager.broadcastMatchStart(GameState.state.currentMapId);
     }
     MultiplayerManager.reportHealth(true);
+    MultiplayerManager.reportGold(true);
     UIManager.setStatus(`${getCurrentMap().name} ready`);
     UIManager.updateAll();
   },
   requestWaveStart() {
     if (GameState.state.waveInProgress || GameState.state.isQuestionOpen || GameState.state.isGameOver || GameState.state.pendingPlacement) return;
     WaveManager.startWave();
+    GameState.state.autoWaveCountdown = 0;
     UIManager.updateAll();
   },
   requestSendEnemy(kind) {
@@ -1434,7 +1474,20 @@ const Game = {
     GameState.state.projectiles = GameState.state.projectiles.filter((projectile) => projectile.active);
     GameState.state.particles = GameState.state.particles.filter((particle) => particle.life > 0);
     GameState.state.flashes = GameState.state.flashes.filter((flash) => flash.life > 0);
+    if (MultiplayerManager.state.connected && !GameState.state.waveInProgress && GameState.state.enemies.length === 0) {
+      if (GameState.state.autoWaveCountdown <= 0) {
+        GameState.state.autoWaveCountdown = 2.5;
+      } else {
+        GameState.state.autoWaveCountdown = Math.max(0, GameState.state.autoWaveCountdown - deltaTime);
+        if (GameState.state.autoWaveCountdown === 0) {
+          WaveManager.startWave();
+        }
+      }
+    } else {
+      GameState.state.autoWaveCountdown = 0;
+    }
     MultiplayerManager.reportHealth();
+    MultiplayerManager.reportGold();
     UIManager.updateAll();
   },
   draw() {

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scholar Siege Lobby</title>
+  <link rel="stylesheet" href="lobby.css">
+</head>
+<body>
+  <main class="lobby-shell">
+    <section class="lobby-card hero-card">
+      <p class="eyebrow">Scholar Siege Multiplayer</p>
+      <h1>Room Lobby</h1>
+      <p class="hero-copy">Create or join a room here, watch the roster fill up, then move into the match when everyone is ready.</p>
+    </section>
+
+    <section class="lobby-grid">
+      <section class="lobby-card">
+        <h2>Join A Room</h2>
+        <div class="form-grid">
+          <label>
+            <span>Your Name</span>
+            <input id="playerNameInput" type="text" maxlength="24" placeholder="Player name">
+          </label>
+          <label>
+            <span>Room Code</span>
+            <input id="roomCodeInput" type="text" maxlength="16" placeholder="room-1234">
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="createRoomButton" class="primary-button">Create Room</button>
+          <button id="joinRoomButton" class="secondary-button">Join Room</button>
+        </div>
+        <div class="button-row">
+          <button id="enterGameButton" class="primary-button" disabled>Enter Match</button>
+          <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
+        </div>
+        <div class="status-grid">
+          <div><span>Status</span><strong id="lobbyStatusValue">Offline</strong></div>
+          <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
+          <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
+          <div><span>Players</span><strong id="roomPopulationValue">0/50</strong></div>
+        </div>
+      </section>
+
+      <section class="lobby-card">
+        <h2>Waiting Room</h2>
+        <p class="section-copy">The first player listed is the host. Everyone in the match will use the host's custom question bank.</p>
+        <ul id="roomPlayerList" class="room-player-list">
+          <li class="room-player-empty">No one is in a room yet.</li>
+        </ul>
+      </section>
+    </section>
+  </main>
+
+  <script src="lobby.js"></script>
+</body>
+</html>

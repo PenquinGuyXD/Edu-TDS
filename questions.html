@@ -73,6 +73,53 @@
         <div id="savedQuestionsList" class="saved-questions-list"></div>
       </article>
     </section>
+
+    <section class="preset-grid">
+      <article class="panel">
+        <div class="saved-header">
+          <div>
+            <h2>Question Presets</h2>
+            <p id="presetCount">0 presets available.</p>
+          </div>
+        </div>
+        <div class="preset-builder">
+          <label>
+            Preset Name
+            <input id="presetNameInput" type="text" maxlength="50" placeholder="My Algebra Pack">
+          </label>
+          <p id="presetEditorHint" class="helper-copy">Presets save the active questions shown in Saved Questions.</p>
+          <div class="form-actions">
+            <button id="savePresetButton" class="primary-button" type="button">Save Current Questions As Preset</button>
+            <button id="cancelPresetEditButton" class="secondary-button" type="button" hidden>Cancel Edit</button>
+          </div>
+        </div>
+        <div id="presetList" class="saved-questions-list"></div>
+      </article>
+
+      <article class="panel">
+        <div class="saved-header">
+          <div>
+            <h2>Share Presets</h2>
+            <p>Export a preset into a share code or import a code someone sends you.</p>
+          </div>
+        </div>
+        <div class="share-stack">
+          <label>
+            Preset To Share
+            <select id="sharePresetSelect"></select>
+          </label>
+          <div class="form-actions">
+            <button id="exportPresetButton" class="secondary-button" type="button">Export Share Code</button>
+            <button id="importPresetButton" class="primary-button" type="button">Import Share Code</button>
+          </div>
+          <label>
+            Share Code
+            <textarea id="shareCodeInput" rows="8" placeholder="Paste a Scholar Siege preset code here, or export one to share."></textarea>
+          </label>
+          <p id="shareMessage" class="share-message"></p>
+        </div>
+      </article>
+    </section>
   </main>
 
   <script src="questions.js"></script>
