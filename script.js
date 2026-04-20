@@ -225,6 +225,9 @@ const GameState = {
   canInteract() {
     return !this.state.isGameOver && !this.state.isQuestionOpen && !this.state.isRestartModalOpen && !this.state.isPreMatch;
   },
+  isMultiplayerSpectating() {
+    return MultiplayerManager.state.connected && this.state.isGameOver;
+  },
   questionPausesGameplay() {
     return !MultiplayerManager.state.connected;
   }
@@ -301,7 +304,10 @@ class Enemy {
     if (GameState.state.hp <= 0) {
       GameState.state.isGameOver = true;
       GameState.state.waveInProgress = false;
-      UIManager.showGameOver(`Wave ${GameState.state.wave} overwhelmed the base.`);
+      const summary = MultiplayerManager.state.connected
+        ? "Your base fell. You are now spectating the rest of the room."
+        : `Wave ${GameState.state.wave} overwhelmed the base.`;
+      UIManager.showGameOver(summary);
     }
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportHealth(true);
   }
@@ -870,7 +876,10 @@ const UIManager = {
     this.elements.sendTankEnemyButton.disabled = raidLocked;
     this.elements.leaveRoomButton.disabled = !MultiplayerManager.state.connected;
     this.elements.pauseButton.disabled = hostControlLocked || GameState.state.isQuestionOpen || GameState.state.isGameOver;
-    this.elements.restartButton.disabled = hostControlLocked || GameState.state.isQuestionOpen;
+    this.elements.restartButton.disabled =
+      hostControlLocked ||
+      GameState.state.isQuestionOpen ||
+      GameState.isMultiplayerSpectating();
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
     this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
     this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
@@ -974,11 +983,22 @@ const UIManager = {
   },
   showGameOver(summary) {
     this.elements.gameOverSummary.textContent = summary;
+    const restartButton = document.getElementById("gameOverRestartButton");
+    if (restartButton) {
+      const spectating = GameState.isMultiplayerSpectating();
+      restartButton.classList.toggle("hidden", spectating);
+      restartButton.disabled = spectating;
+    }
     this.elements.gameOverOverlay.classList.remove("hidden");
     this.updateAll();
   },
   hideGameOver() {
     if (this.elements.gameOverOverlay) this.elements.gameOverOverlay.classList.add("hidden");
+    const restartButton = document.getElementById("gameOverRestartButton");
+    if (restartButton) {
+      restartButton.classList.remove("hidden");
+      restartButton.disabled = false;
+    }
   },
   showPreMatch() {
     if (!this.elements.preMatchOverlay) return;
@@ -1310,6 +1330,10 @@ const Game = {
       }
     });
     document.getElementById("restartButton").addEventListener("click", () => {
+      if (GameState.isMultiplayerSpectating()) {
+        UIManager.setStatus("Defeated players spectate until the room match ends");
+        return;
+      }
       if (!MultiplayerManager.canControlMatch()) {
         UIManager.setStatus("Only the host can restart a room match");
         return;
@@ -1317,6 +1341,11 @@ const Game = {
       if (!GameState.state.isQuestionOpen) UIManager.showRestartModal();
     });
     document.getElementById("confirmRestartButton").addEventListener("click", () => {
+      if (GameState.isMultiplayerSpectating()) {
+        UIManager.hideRestartModal();
+        UIManager.setStatus("Defeated players spectate until the room match ends");
+        return;
+      }
       if (!MultiplayerManager.canControlMatch()) {
         UIManager.setStatus("Only the host can restart a room match");
         return;
@@ -1325,7 +1354,13 @@ const Game = {
       UIManager.setStatus("Run restarted");
     });
     document.getElementById("cancelRestartButton").addEventListener("click", () => UIManager.hideRestartModal());
-    document.getElementById("gameOverRestartButton").addEventListener("click", () => UIManager.showRestartModal());
+    document.getElementById("gameOverRestartButton").addEventListener("click", () => {
+      if (GameState.isMultiplayerSpectating()) {
+        UIManager.setStatus("Defeated players spectate until the room match ends");
+        return;
+      }
+      UIManager.showRestartModal();
+    });
     document.getElementById("bombButton").addEventListener("click", () => this.requestAbility("bomb"));
     document.getElementById("freezeButton").addEventListener("click", () => this.requestAbility("freeze"));
     document.getElementById("quickSellButton").addEventListener("click", () => this.sellSelectedTower());
