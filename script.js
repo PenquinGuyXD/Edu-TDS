@@ -1135,7 +1135,6 @@ const MultiplayerManager = {
         this.state.hostQuestions = event.hostQuestions;
         refreshQuestionBank();
       }
-      this.reportHealth(true);
       UIManager.updateAll();
       return;
     }
@@ -1166,6 +1165,14 @@ const MultiplayerManager = {
     if (event.type === "health_update") {
       const player = this.state.players.find((entry) => entry.id === event.sender);
       if (player) player.hp = event.payload.hp;
+      this.updateOpponent();
+      UIManager.updateAll();
+      return;
+    }
+
+    if (event.type === "gold_update") {
+      const player = this.state.players.find((entry) => entry.id === event.sender);
+      if (player) player.gold = event.payload.gold;
       this.updateOpponent();
       UIManager.updateAll();
     }
@@ -1312,7 +1319,7 @@ const Game = {
     }
     GameState.state.isPreMatch = false;
     UIManager.hidePreMatch();
-    if (MultiplayerManager.state.connected) GameState.state.autoWaveCountdown = 2.5;
+    GameState.state.autoWaveCountdown = 2.5;
     if (!skipRelay && MultiplayerManager.state.connected) {
       await MultiplayerManager.broadcastMatchStart(GameState.state.currentMapId);
     }
@@ -1474,12 +1481,12 @@ const Game = {
     GameState.state.projectiles = GameState.state.projectiles.filter((projectile) => projectile.active);
     GameState.state.particles = GameState.state.particles.filter((particle) => particle.life > 0);
     GameState.state.flashes = GameState.state.flashes.filter((flash) => flash.life > 0);
-    if (MultiplayerManager.state.connected && !GameState.state.waveInProgress && GameState.state.enemies.length === 0) {
+    if (!GameState.state.waveInProgress && GameState.state.enemies.length === 0) {
       if (GameState.state.autoWaveCountdown <= 0) {
         GameState.state.autoWaveCountdown = 2.5;
       } else {
         GameState.state.autoWaveCountdown = Math.max(0, GameState.state.autoWaveCountdown - deltaTime);
-        if (GameState.state.autoWaveCountdown === 0) {
+        if (GameState.state.autoWaveCountdown <= 0.001) {
           WaveManager.startWave();
         }
       }
@@ -1530,8 +1537,13 @@ const Game = {
     if (!GameState.state.lastTime) GameState.state.lastTime = timestamp;
     const deltaTime = Math.min(0.033, (timestamp - GameState.state.lastTime) / 1000);
     GameState.state.lastTime = timestamp;
-    this.update(deltaTime);
-    this.draw();
+    try {
+      this.update(deltaTime);
+      this.draw();
+    } catch (error) {
+      console.error("Game loop error:", error);
+      UIManager.setStatus("A game error occurred. The loop recovered.");
+    }
     requestAnimationFrame((time) => this.loop(time));
   }
 };
