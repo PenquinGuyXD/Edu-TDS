@@ -321,7 +321,7 @@ function handleEvents(req, res, url) {
 }
 
 function serveStatic(req, res, url) {
-  const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
+  const pathname = url.pathname === "/" ? "/lobby.html" : url.pathname;
   const filePath = path.join(ROOT, pathname);
   if (!filePath.startsWith(ROOT)) {
     sendJson(res, 403, { error: "Forbidden" });

@@ -610,6 +610,7 @@ const WaveManager = {
   queue: [],
   spawnTimer: 0,
   spawnInterval: 1.15,
+  preWaveDelay: 10,
   reset() {
     this.queue = [];
     this.spawnTimer = 0;
@@ -751,6 +752,7 @@ const UIManager = {
       statusValue: document.getElementById("statusValue"),
       towerShop: document.getElementById("towerShop"),
       openQuestionEditorButton: document.getElementById("openQuestionEditorButton"),
+      spectateButton: document.getElementById("spectateButton"),
       openLobbyScreenButton: document.getElementById("openLobbyScreenButton"),
       roomCodeBanner: document.getElementById("roomCodeBanner"),
       selectedTowerPanel: document.getElementById("selectedTowerPanel"),
@@ -897,6 +899,9 @@ const UIManager = {
     const { hp, gold, wave, isPaused, isGameOver, waveInProgress, abilityCooldowns, pendingPlacement } = GameState.state;
     const actionLocked = !GameState.canInteract() || Boolean(pendingPlacement);
     const onlineMatch = MultiplayerManager.state.connected;
+    if (onlineMatch && GameState.state.isPaused) {
+      GameState.state.isPaused = false;
+    }
     if (this.elements.hpValue) this.elements.hpValue.textContent = hp;
     this.elements.goldValue.textContent = gold;
     this.elements.waveValue.textContent = wave;
@@ -918,6 +923,7 @@ const UIManager = {
     this.elements.restartButton.disabled = onlineMatch || GameState.state.isQuestionOpen || GameState.isMultiplayerSpectating();
     this.elements.pauseButton.classList.toggle("hidden", onlineMatch);
     this.elements.restartButton.classList.toggle("hidden", onlineMatch);
+    this.elements.spectateButton.classList.toggle("hidden", !GameState.isMultiplayerSpectating());
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
     this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
     this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
@@ -1161,6 +1167,7 @@ const MultiplayerManager = {
       this.state.players = Array.isArray(payload.players) ? payload.players : [];
       this.state.selectedMapId = payload.selectedMapId || MAPS[0].id;
       this.state.matchStarted = Boolean(payload.matchStarted);
+      GameState.state.isPaused = false;
       this.state.boards = Object.fromEntries((Array.isArray(payload.players) ? payload.players : []).map((player) => [player.id, player.board || null]));
       this.state.side = this.isHost() ? "host" : "player";
       this.updateOpponent();
@@ -1394,6 +1401,15 @@ const Game = {
         event.preventDefault();
       }
     });
+    document.getElementById("spectateButton").addEventListener("click", () => {
+      if (!GameState.isMultiplayerSpectating()) return;
+      const fallbackPlayer = MultiplayerManager.state.players.find((player) => player.id !== MultiplayerManager.state.playerId && MultiplayerManager.state.boards[player.id]);
+      if (!fallbackPlayer) {
+        UIManager.setStatus("No other live board is ready to spectate yet");
+        return;
+      }
+      this.setSpectatedPlayer(fallbackPlayer.id);
+    });
     document.getElementById("openLobbyScreenButton").addEventListener("click", (event) => {
       const opened = window.open("lobby.html", "_blank", "noopener");
       if (opened) {
@@ -1493,9 +1509,12 @@ const Game = {
       await MultiplayerManager.syncHostQuestions();
       refreshQuestionBank();
     }
+    if (MultiplayerManager.state.connected) {
+      GameState.state.isPaused = false;
+    }
     GameState.state.isPreMatch = false;
     UIManager.hidePreMatch();
-    GameState.state.autoWaveCountdown = 2.5;
+    GameState.state.autoWaveCountdown = WaveManager.preWaveDelay;
     if (!skipRelay && MultiplayerManager.state.connected) {
       await MultiplayerManager.broadcastMatchStart(GameState.state.currentMapId);
     }
@@ -1507,8 +1526,8 @@ const Game = {
   },
   requestWaveStart() {
     if (GameState.state.waveInProgress || GameState.state.isQuestionOpen || GameState.state.isGameOver || GameState.state.pendingPlacement) return;
-    WaveManager.startWave();
-    GameState.state.autoWaveCountdown = 0;
+    GameState.state.autoWaveCountdown = WaveManager.preWaveDelay;
+    UIManager.setStatus(`Next wave in ${Math.ceil(GameState.state.autoWaveCountdown)}s`);
     UIManager.updateAll();
   },
   requestSendEnemy(kind) {
@@ -1709,9 +1728,11 @@ const Game = {
     GameState.state.flashes = GameState.state.flashes.filter((flash) => flash.life > 0);
     if (!GameState.state.waveInProgress && GameState.state.enemies.length === 0) {
       if (GameState.state.autoWaveCountdown <= 0) {
-        GameState.state.autoWaveCountdown = 2.5;
+        GameState.state.autoWaveCountdown = WaveManager.preWaveDelay;
+        UIManager.setStatus(`Next wave in ${Math.ceil(GameState.state.autoWaveCountdown)}s`);
       } else {
         GameState.state.autoWaveCountdown = Math.max(0, GameState.state.autoWaveCountdown - deltaTime);
+        UIManager.setStatus(`Next wave in ${Math.ceil(GameState.state.autoWaveCountdown)}s`);
         if (GameState.state.autoWaveCountdown <= 0.001) {
           WaveManager.startWave();
         }
