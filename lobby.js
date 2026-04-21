@@ -103,7 +103,7 @@ function createMapPreviewDataUri(map) {
 }
 
 function formatDurationMs(durationMs) {
-  const totalSeconds = Math.max(60, Math.round((Number(durationMs) || DEFAULT_MATCH_DURATION_MS) / 1000));
+  const totalSeconds = Math.max(10, Math.round((Number(durationMs) || DEFAULT_MATCH_DURATION_MS) / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
@@ -115,8 +115,9 @@ function parseDurationInput(value) {
   if (!match) return null;
   const minutes = Number(match[1]);
   const seconds = Number(match[2] || 0);
-  if (minutes < 1) return null;
-  return (minutes * 60 + seconds) * 1000;
+  const totalSeconds = minutes * 60 + seconds;
+  if (totalSeconds < 10) return null;
+  return totalSeconds * 1000;
 }
 
 const Lobby = {

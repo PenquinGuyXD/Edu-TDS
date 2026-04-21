@@ -9,7 +9,7 @@ const ROOT = __dirname;
 const MAX_ROOM_PLAYERS = 50;
 const DEFAULT_MAP_ID = "meadow-pass";
 const DEFAULT_MATCH_DURATION_MS = 5 * 60 * 1000;
-const MIN_MATCH_DURATION_MS = 60 * 1000;
+const MIN_MATCH_DURATION_MS = 10 * 1000;
 const MAX_MATCH_DURATION_MS = 60 * 60 * 1000;
 
 const MIME_TYPES = {

@@ -390,6 +390,9 @@ class Enemy {
     if (this.health <= 0) {
       this.isAlive = false;
     }
+    if (typeof MultiplayerManager !== "undefined" && MultiplayerManager.state.connected) {
+      MultiplayerManager.reportBoard(true);
+    }
   }
 
   reachBase() {
@@ -411,6 +414,9 @@ class Enemy {
       UIManager.showGameOver(summary);
     }
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportHealth(true);
+    if (typeof MultiplayerManager !== "undefined" && MultiplayerManager.state.connected) {
+      MultiplayerManager.reportBoard(true);
+    }
   }
 
   draw(ctx) {
@@ -681,6 +687,7 @@ const WaveManager = {
     this.queue = this.buildWave(wave);
     this.spawnTimer = 0;
     UIManager.setStatus(`Wave ${wave} started`);
+    if (MultiplayerManager.state.connected) MultiplayerManager.reportBoard(true);
     return true;
   },
   buildWave(wave) {
@@ -711,10 +718,12 @@ const WaveManager = {
     if (this.queue.length > 0 && this.spawnTimer <= 0) {
       GameState.state.enemies.push(new Enemy(this.queue.shift()));
       this.spawnTimer = Math.max(0.42, this.spawnInterval - GameState.state.wave * 0.03);
+      if (MultiplayerManager.state.connected) MultiplayerManager.reportBoard(true);
     }
     if (this.queue.length === 0 && GameState.state.enemies.length === 0) {
       GameState.state.waveInProgress = false;
       UIManager.setStatus("Wave cleared");
+      if (MultiplayerManager.state.connected) MultiplayerManager.reportBoard(true);
     }
   }
 };
