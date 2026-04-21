@@ -288,7 +288,7 @@ function handleRelay(req, res, body) {
   }
 
   publish(room, event);
-  if (body.type === "health_update" || body.type === "gold_update" || body.type === "board_update" || body.type === "select_map" || body.type === "lobby_start") {
+  if (body.type === "health_update" || body.type === "gold_update" || body.type === "select_map" || body.type === "lobby_start") {
     publishRoom(room);
   }
   sendJson(res, 200, { ok: true });

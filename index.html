@@ -120,19 +120,16 @@
 
         <section class="panel">
           <div class="panel-header">
-            <h2>How To Play</h2>
-            <p>Learn, defend, and survive.</p>
+            <h2>Send Enemies</h2>
+            <p>Answer a question, spend gold, and unlock stronger invasions every 2 waves.</p>
           </div>
-          <ul class="info-list">
-            <li>Only your custom-made questions are used in the game.</li>
-            <li>Correct answers earn gold and activate tower and ability purchases.</li>
-            <li>Farm Towers boost question rewards for the whole run.</li>
-            <li>Sniper Towers hit hard across nearly the whole map.</li>
-            <li>Starting a wave no longer needs a question prompt.</li>
-            <li>Sending raid enemies now only costs gold and no longer asks a question.</li>
-            <li>Each new match begins with a map selection.</li>
-            <li>If an enemy reaches the base, you lose HP equal to its remaining health.</li>
-          </ul>
+          <details class="dropdown-panel" open>
+            <summary>Invasions</summary>
+            <div class="dropdown-content">
+              <div id="invasionUnlockText" class="invasion-unlock-text">All invasions locked until wave 2.</div>
+              <div id="invasionList" class="enemy-send-grid"></div>
+            </div>
+          </details>
         </section>
       </aside>
     </main>
@@ -164,18 +161,17 @@
           </div>
 
           <div class="multiplayer-card">
-            <h3>Send Enemies</h3>
-            <p class="multiplayer-copy">Spend gold to spawn pressure on the other side instantly.</p>
-            <div class="enemy-send-grid">
-              <button id="sendBasicEnemyButton" class="secondary-button" disabled>Send Scout Rush</button>
-              <button id="sendFastEnemyButton" class="secondary-button" disabled>Send Speedsters</button>
-              <button id="sendTankEnemyButton" class="secondary-button" disabled>Send Tank Drop</button>
-            </div>
-            <div class="multiplayer-status-list compact">
-              <div><span>Scout Rush</span><strong>35g</strong></div>
-              <div><span>Speedsters</span><strong>55g</strong></div>
-              <div><span>Tank Drop</span><strong>90g</strong></div>
-            </div>
+            <h3>How To Play</h3>
+            <ul class="info-list">
+              <li>Only your custom-made questions are used in the game.</li>
+              <li>Correct answers earn gold and activate tower and ability purchases.</li>
+              <li>Farm Towers boost question rewards for the whole run.</li>
+              <li>Sniper Towers hit hard across nearly the whole map.</li>
+              <li>Every wave now has a 10-second countdown before it begins.</li>
+              <li>Enemy invasions unlock every 2 waves.</li>
+              <li>Each new match begins with a map selection.</li>
+              <li>If an enemy reaches the base, you lose HP equal to its remaining health.</li>
+            </ul>
           </div>
         </div>
       </div>

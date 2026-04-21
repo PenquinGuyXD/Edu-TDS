@@ -222,9 +222,13 @@ canvas {
   z-index: 1;
 }
 .tower-icon.basic { background: linear-gradient(145deg, #7fd3ff, #2f89df); }
+.tower-icon.basic::after { content: ""; position: absolute; width: 10px; height: 18px; left: 16px; top: 5px; background: rgba(255,255,255,0.85); border-radius: 999px; }
 .tower-icon.rapid { background: linear-gradient(145deg, #a4ff9d, #44b857); box-shadow: 0 0 0 6px rgba(125, 255, 135, 0.12); }
+.tower-icon.rapid::after { content: ""; position: absolute; inset: 9px 8px; background: repeating-linear-gradient(90deg, rgba(14,39,16,0.8) 0 3px, transparent 3px 6px); border-radius: 999px; }
 .tower-icon.heavy { background: linear-gradient(145deg, #ffc28a, #d96e2f); }
+.tower-icon.heavy::after { content: ""; position: absolute; width: 30px; height: 10px; left: 6px; top: 16px; background: rgba(75,42,17,0.75); border-radius: 999px; }
 .tower-icon.farm { background: linear-gradient(145deg, #ffe59b, #c5a12d); border-radius: 12px; }
+.tower-icon.farm::after { content: ""; position: absolute; inset: 8px; background: linear-gradient(180deg, #58a84f 0 40%, #d0a24d 40% 100%); border-radius: 8px; }
 .tower-icon.sniper { background: linear-gradient(145deg, #ffffff, #929cab); }
 .tower-icon.sniper::after {
   content: "";
@@ -373,6 +377,52 @@ canvas {
 .enemy-send-grid {
   display: grid;
   gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+.enemy-send-grid::-webkit-scrollbar { width: 8px; }
+.enemy-send-grid::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 999px; }
+.enemy-send-grid::-webkit-scrollbar-track { background: transparent; }
+.invasion-unlock-text {
+  margin-bottom: 6px;
+  color: var(--gold);
+  font-size: 0.8rem;
+}
+.invasion-card {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  text-align: left;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+.invasion-card strong {
+  font-size: 0.86rem;
+}
+.invasion-card span:nth-of-type(2),
+.invasion-card span:nth-of-type(3),
+.invasion-card span:nth-of-type(4) {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.invasion-card span:nth-of-type(4) {
+  grid-column: 2 / 4;
+}
+.invasion-card.locked {
+  opacity: 0.65;
+}
+.invasion-badge {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--raid-color, #fff);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--raid-color, #fff) 20%, transparent);
 }
 .map-selection-list { display: grid; gap: 10px; margin: 14px 0; text-align: left; }
 .map-card {

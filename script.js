@@ -114,9 +114,12 @@ const abilityCatalog = {
 };
 
 const multiplayerEnemyCatalog = {
-  basic: { label: "Scout Rush", cost: 35, count: 3 },
-  fast: { label: "Speedsters", cost: 55, count: 3 },
-  tank: { label: "Tank Drop", cost: 90, count: 1 }
+  basic: { key: "basic", label: "Scout Rush", cost: 35, count: 3, tier: 1, color: "#59a6ff", description: "Balanced starter pressure." },
+  fast: { key: "fast", label: "Speedsters", cost: 55, count: 3, tier: 2, color: "#ffd84a", description: "Rush weak gaps with speed." },
+  tank: { key: "tank", label: "Tank Drop", cost: 90, count: 1, tier: 3, color: "#ff6b6b", description: "One huge bruiser." },
+  swarm: { key: "swarm", label: "Swarm Burst", cost: 70, count: 5, tier: 4, color: "#8cffd7", description: "Small bodies that flood lanes." },
+  armored: { key: "armored", label: "Iron Wall", cost: 110, count: 2, tier: 5, color: "#b2b9c9", description: "Slow armored push." },
+  phantom: { key: "phantom", label: "Phantom Raid", cost: 125, count: 2, tier: 6, color: "#c49bff", description: "Fast elite raiders." }
 };
 
 const MAPS = [
@@ -222,7 +225,7 @@ const GameState = {
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportBoard(true);
   },
   getFarmMultiplier() {
-    // Economy system: only questions and enemy kills create gold.
+    // Economy system: only questions create gold.
     const farms = this.state.towers.filter((tower) => tower.type === "farm");
     const bonus = farms.reduce((sum, tower) => sum + tower.getFarmBonus(), 0);
     return 1 + bonus;
@@ -305,8 +308,6 @@ class Enemy {
     this.health -= amount;
     if (this.health <= 0) {
       this.isAlive = false;
-      GameState.addGold(this.reward);
-      GameState.state.particles.push(new FloatingText(`+${this.reward}g`, this.x, this.y, "#ffcf5d"));
     }
   }
 
@@ -334,13 +335,7 @@ class Enemy {
   draw(ctx) {
     if (!this.isAlive) return;
     ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = this.color;
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgba(255,255,255,0.55)";
-    ctx.stroke();
+    drawEnemyBody(ctx, this);
 
     const barWidth = this.radius * 2.3;
     const healthRatio = Math.max(0, this.health / this.maxHealth);
@@ -575,25 +570,7 @@ class Tower {
 
   draw(ctx, selected = false) {
     ctx.save();
-    ctx.beginPath();
-    ctx.fillStyle = this.color;
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = selected ? 4 : 2;
-    ctx.strokeStyle = selected ? "#ffcf5d" : "rgba(10,20,34,0.8)";
-    ctx.stroke();
-
-    if (this.type === "sniper") {
-      ctx.strokeStyle = "#111";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(this.x, this.y);
-      ctx.lineTo(this.x + 16, this.y - 16);
-      ctx.stroke();
-    } else if (this.type === "farm") {
-      ctx.fillStyle = "rgba(80,50,8,0.35)";
-      ctx.fillRect(this.x - 11, this.y - 11, 22, 22);
-    }
+    drawTowerBody(ctx, this, selected);
 
     if (selected && this.type !== "farm") {
       ctx.globalAlpha = 0.18;
@@ -627,9 +604,12 @@ const WaveManager = {
   },
   buildWave(wave) {
     const enemyTypes = [
-      { type: "basic", health: 28 + wave * 9, speed: 64 + wave * 1.6, reward: 12 + wave * 2, color: "#59a6ff", radius: 16 },
-      { type: "fast", health: 18 + wave * 6, speed: 96 + wave * 2.4, reward: 14 + wave * 2.2, color: "#ffd84a", radius: 13 },
-      { type: "tank", health: 65 + wave * 18, speed: 40 + wave * 1.1, reward: 24 + wave * 3.5, color: "#ff6b6b", radius: 19 }
+      { type: "basic", health: 28 + wave * 9, speed: 64 + wave * 1.6, reward: 0, color: "#59a6ff", radius: 16 },
+      { type: "fast", health: 18 + wave * 6, speed: 96 + wave * 2.4, reward: 0, color: "#ffd84a", radius: 13 },
+      { type: "tank", health: 65 + wave * 18, speed: 40 + wave * 1.1, reward: 0, color: "#ff6b6b", radius: 19 },
+      { type: "swarm", health: 12 + wave * 4, speed: 108 + wave * 2.8, reward: 0, color: "#8cffd7", radius: 10 },
+      { type: "armored", health: 88 + wave * 20, speed: 34 + wave * 1.0, reward: 0, color: "#b2b9c9", radius: 18 },
+      { type: "phantom", health: 34 + wave * 8, speed: 120 + wave * 2.6, reward: 0, color: "#c49bff", radius: 14 }
     ];
     const total = 6 + wave * 2;
     const entries = [];
@@ -637,7 +617,9 @@ const WaveManager = {
       let template = enemyTypes[0];
       if (wave >= 2 && i % 3 === 1) template = enemyTypes[1];
       if (wave >= 3 && i % 4 === 3) template = enemyTypes[2];
-      if (wave >= 6 && i % 5 === 4) template = enemyTypes[2];
+      if (wave >= 4 && i % 5 === 2) template = enemyTypes[3];
+      if (wave >= 6 && i % 5 === 4) template = enemyTypes[4];
+      if (wave >= 8 && i % 6 === 5) template = enemyTypes[5];
       entries.push({ ...template });
     }
     return entries;
@@ -755,6 +737,8 @@ const UIManager = {
       spectateButton: document.getElementById("spectateButton"),
       openLobbyScreenButton: document.getElementById("openLobbyScreenButton"),
       roomCodeBanner: document.getElementById("roomCodeBanner"),
+      invasionList: document.getElementById("invasionList"),
+      invasionUnlockText: document.getElementById("invasionUnlockText"),
       selectedTowerPanel: document.getElementById("selectedTowerPanel"),
       quickSellButton: document.getElementById("quickSellButton"),
       pauseButton: document.getElementById("pauseButton"),
@@ -783,9 +767,6 @@ const UIManager = {
       playerRoleValue: document.getElementById("playerRoleValue"),
       questionSourceValue: document.getElementById("questionSourceValue"),
       boardHealthList: document.getElementById("boardHealthList"),
-      sendBasicEnemyButton: document.getElementById("sendBasicEnemyButton"),
-      sendFastEnemyButton: document.getElementById("sendFastEnemyButton"),
-      sendTankEnemyButton: document.getElementById("sendTankEnemyButton"),
       questionModal: document.getElementById("questionModal"),
       questionPrompt: document.getElementById("questionPrompt"),
       questionOptions: document.getElementById("questionOptions"),
@@ -795,6 +776,7 @@ const UIManager = {
       restartModal: document.getElementById("restartModal")
     };
     this.renderTowerShop();
+    this.renderInvasionPanel();
     this.renderMapSelection();
     this.renderBoardHealth();
     this.updateAll();
@@ -850,6 +832,25 @@ const UIManager = {
       button.addEventListener("click", () => Game.requestTowerPurchase(tower.key));
       card.appendChild(button);
       this.elements.towerShop.appendChild(card);
+    });
+  },
+  renderInvasionPanel() {
+    if (!this.elements.invasionList) return;
+    this.elements.invasionList.innerHTML = "";
+    Object.values(multiplayerEnemyCatalog).forEach((raid) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "invasion-card";
+      button.dataset.kind = raid.key;
+      button.innerHTML = `
+        <span class="invasion-badge" style="--raid-color:${raid.color}"></span>
+        <strong>${raid.label}</strong>
+        <span>${raid.cost}g</span>
+        <span>Tier ${raid.tier}</span>
+        <span>${raid.description}</span>
+      `;
+      button.addEventListener("click", () => Game.requestSendEnemy(raid.key));
+      this.elements.invasionList.appendChild(button);
     });
   },
   renderBoardHealth() {
@@ -915,9 +916,6 @@ const UIManager = {
     this.elements.freezeButton.disabled = actionLocked || abilityCooldowns.freeze > 0;
     this.elements.quickSellButton.disabled = actionLocked || !GameState.state.selectedTowerId;
     const raidLocked = actionLocked || !MultiplayerManager.canSendRaid();
-    this.elements.sendBasicEnemyButton.disabled = raidLocked;
-    this.elements.sendFastEnemyButton.disabled = raidLocked;
-    this.elements.sendTankEnemyButton.disabled = raidLocked;
     this.elements.leaveRoomButton.disabled = !MultiplayerManager.state.connected;
     this.elements.pauseButton.disabled = onlineMatch || GameState.state.isQuestionOpen || GameState.state.isGameOver;
     this.elements.restartButton.disabled = onlineMatch || GameState.state.isQuestionOpen || GameState.isMultiplayerSpectating();
@@ -931,8 +929,24 @@ const UIManager = {
     this.elements.roomCodeBanner.classList.toggle("hidden", !MultiplayerManager.state.connected);
     this.elements.playerRoleValue.textContent = MultiplayerManager.getRoleLabel();
     this.elements.questionSourceValue.textContent = MultiplayerManager.getQuestionSourceLabel();
+    const unlockedTier = Game.getUnlockedInvasionTier();
+    if (this.elements.invasionUnlockText) {
+      this.elements.invasionUnlockText.textContent = unlockedTier <= 0
+        ? "All invasions locked until wave 2."
+        : `Unlocked invasion tier: ${unlockedTier}. Next tier every 2 waves.`;
+    }
     this.renderBoardHealth();
     this.renderSpectatorHealth();
+    this.elements.invasionList?.querySelectorAll(".invasion-card").forEach((button) => {
+      const raid = multiplayerEnemyCatalog[button.dataset.kind];
+      const unlocked = Game.isInvasionUnlocked(button.dataset.kind);
+      button.disabled = raidLocked || !unlocked;
+      button.classList.toggle("locked", !unlocked);
+      if (raid) {
+        const detail = button.querySelectorAll("span")[1];
+        if (detail) detail.textContent = unlocked ? `${raid.cost}g` : `Unlocks at wave ${raid.tier * 2}`;
+      }
+    });
     this.elements.towerShop.querySelectorAll("button").forEach((button) => {
       button.disabled = actionLocked;
     });
@@ -1366,7 +1380,7 @@ const MultiplayerManager = {
   reportBoard(force = false) {
     if (!this.state.connected) return;
     const now = Date.now();
-    if (!force && now - this.state.lastBoardSentAt < 250) return;
+    if (!force && now - this.state.lastBoardSentAt < 33) return;
     const board = Game.buildBoardSnapshot();
     const serialized = JSON.stringify(board);
     if (!force && this.state.lastSentBoard === serialized) return;
@@ -1462,9 +1476,6 @@ const Game = {
     document.getElementById("quickSellButton").addEventListener("click", () => this.sellSelectedTower());
     document.getElementById("startMatchButton").addEventListener("click", () => this.startMatch());
     document.getElementById("leaveRoomButton").addEventListener("click", () => MultiplayerManager.leaveRoom());
-    document.getElementById("sendBasicEnemyButton").addEventListener("click", () => this.requestSendEnemy("basic"));
-    document.getElementById("sendFastEnemyButton").addEventListener("click", () => this.requestSendEnemy("fast"));
-    document.getElementById("sendTankEnemyButton").addEventListener("click", () => this.requestSendEnemy("tank"));
 
     this.canvas.addEventListener("mousemove", (event) => {
       const point = this.getCanvasPoint(event);
@@ -1489,6 +1500,14 @@ const Game = {
   },
   askFreeQuestion() {
     QuestionManager.ask("free", ({ correct }) => UIManager.setStatus(correct ? "Knowledge rewarded" : "Study and try again"));
+  },
+  getUnlockedInvasionTier() {
+    return Math.max(0, Math.floor(GameState.state.wave / 2));
+  },
+  isInvasionUnlocked(kind) {
+    const raid = multiplayerEnemyCatalog[kind];
+    if (!raid) return false;
+    return this.getUnlockedInvasionTier() >= raid.tier;
   },
   async startMatch(options = {}) {
     const { skipRelay = false, remoteMapId = null } = options;
@@ -1533,6 +1552,10 @@ const Game = {
   requestSendEnemy(kind) {
     const raid = multiplayerEnemyCatalog[kind];
     if (!raid || !MultiplayerManager.canSendRaid()) return;
+    if (!this.isInvasionUnlocked(kind)) {
+      UIManager.setStatus(`That invasion unlocks at wave ${raid.tier * 2}`);
+      return;
+    }
     QuestionManager.ask({ id: `raid-${kind}`, suppressReward: true }, ({ correct }) => {
       if (!correct) {
         UIManager.setStatus("Raid canceled");
@@ -1847,28 +1870,54 @@ function drawRemoteBoard(ctx, board) {
   (board?.enemies || []).forEach((enemy) => drawEnemySnapshot(ctx, enemy));
 }
 
-function drawTowerSnapshot(ctx, tower) {
-  const data = towerCatalog[tower.type] || towerCatalog.basic;
-  const color = data.color;
-  ctx.save();
+function drawTowerBody(ctx, tower, selected = false) {
+  const radius = tower.radius || 20;
   ctx.beginPath();
-  ctx.fillStyle = color;
-  ctx.arc(tower.x, tower.y, 20, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(10,20,34,0.8)";
+  if (tower.type === "farm") {
+    ctx.fillStyle = "#7a5b24";
+    ctx.roundRect(tower.x - 18, tower.y - 18, 36, 36, 10);
+    ctx.fill();
+    ctx.fillStyle = "#ffd86b";
+    ctx.fillRect(tower.x - 12, tower.y - 4, 24, 14);
+    ctx.fillStyle = "#5db357";
+    ctx.fillRect(tower.x - 12, tower.y - 12, 24, 8);
+  } else {
+    ctx.fillStyle = tower.color;
+    ctx.arc(tower.x, tower.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineWidth = selected ? 4 : 2;
+  ctx.strokeStyle = selected ? "#ffcf5d" : "rgba(10,20,34,0.8)";
   ctx.stroke();
-  if (tower.type === "sniper") {
+
+  if (tower.type === "basic") {
+    ctx.fillStyle = "#dff6ff";
+    ctx.fillRect(tower.x - 4, tower.y - 16, 8, 18);
+  } else if (tower.type === "rapid") {
+    ctx.fillStyle = "#16331a";
+    for (let i = -1; i <= 1; i += 1) {
+      ctx.fillRect(tower.x - 9 + i * 6, tower.y - 13, 4, 16);
+    }
+  } else if (tower.type === "heavy") {
+    ctx.fillStyle = "#4b2a11";
+    ctx.fillRect(tower.x - 6, tower.y - 18, 12, 20);
+    ctx.fillRect(tower.x - 14, tower.y - 4, 28, 8);
+  } else if (tower.type === "sniper") {
     ctx.strokeStyle = "#111";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(tower.x, tower.y);
-    ctx.lineTo(tower.x + 16, tower.y - 16);
+    ctx.moveTo(tower.x - 5, tower.y - 3);
+    ctx.lineTo(tower.x + 18, tower.y - 18);
     ctx.stroke();
-  } else if (tower.type === "farm") {
-    ctx.fillStyle = "rgba(80,50,8,0.35)";
-    ctx.fillRect(tower.x - 11, tower.y - 11, 22, 22);
+    ctx.fillStyle = "#111";
+    ctx.fillRect(tower.x - 3, tower.y - 14, 6, 10);
   }
+}
+
+function drawTowerSnapshot(ctx, tower) {
+  const data = towerCatalog[tower.type] || towerCatalog.basic;
+  ctx.save();
+  drawTowerBody(ctx, { ...tower, color: data.color, radius: 20 }, false);
   ctx.fillStyle = "#eef4ff";
   ctx.font = "bold 11px Segoe UI";
   ctx.textAlign = "center";
@@ -1878,13 +1927,7 @@ function drawTowerSnapshot(ctx, tower) {
 
 function drawEnemySnapshot(ctx, enemy) {
   ctx.save();
-  ctx.beginPath();
-  ctx.fillStyle = enemy.color || "#59a6ff";
-  ctx.arc(enemy.x, enemy.y, enemy.radius || 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(255,255,255,0.55)";
-  ctx.stroke();
+  drawEnemyBody(ctx, enemy);
   const radius = enemy.radius || 16;
   const barWidth = radius * 2.3;
   const healthRatio = Math.max(0, Math.min(1, (enemy.health || 0) / Math.max(1, enemy.maxHealth || 1)));
@@ -1901,6 +1944,53 @@ function drawEnemySnapshot(ctx, enemy) {
     ctx.fillText(enemy.senderName, enemy.x, enemy.y - radius - 18);
   }
   ctx.restore();
+}
+
+function drawEnemyBody(ctx, enemy) {
+  const radius = enemy.radius || 16;
+  ctx.fillStyle = enemy.color || "#59a6ff";
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 2;
+  if (enemy.type === "tank" || enemy.type === "armored") {
+    ctx.beginPath();
+    ctx.roundRect(enemy.x - radius, enemy.y - radius, radius * 2, radius * 2, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fillRect(enemy.x - radius + 4, enemy.y - 4, radius * 2 - 8, 8);
+    return;
+  }
+  if (enemy.type === "swarm") {
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(enemy.x - 8 + i * 8, enemy.y, radius * 0.52, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    return;
+  }
+  if (enemy.type === "phantom") {
+    ctx.beginPath();
+    ctx.moveTo(enemy.x, enemy.y - radius);
+    ctx.lineTo(enemy.x + radius, enemy.y);
+    ctx.lineTo(enemy.x, enemy.y + radius);
+    ctx.lineTo(enemy.x - radius, enemy.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    return;
+  }
+  if (enemy.type === "fast") {
+    ctx.beginPath();
+    ctx.ellipse(enemy.x, enemy.y, radius + 2, radius - 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    return;
+  }
+  ctx.beginPath();
+  ctx.arc(enemy.x, enemy.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 }
 
 function drawSpectatorOverlay(ctx) {
@@ -1958,7 +2048,7 @@ function buildRaidEnemy(kind, index, senderName = "") {
       type: "fast",
       health: 24 + wave * 7,
       speed: 112 + wave * 2.5 + offset,
-      reward: 10 + wave,
+      reward: 0,
       color: "#ffd84a",
       radius: 13,
       senderName
@@ -1969,9 +2059,42 @@ function buildRaidEnemy(kind, index, senderName = "") {
       type: "tank",
       health: 90 + wave * 22,
       speed: 42 + wave * 1.3,
-      reward: 20 + wave * 2,
+      reward: 0,
       color: "#ff6b6b",
       radius: 20,
+      senderName
+    };
+  }
+  if (kind === "swarm") {
+    return {
+      type: "swarm",
+      health: 14 + wave * 5,
+      speed: 126 + wave * 3 + offset,
+      reward: 0,
+      color: "#8cffd7",
+      radius: 10,
+      senderName
+    };
+  }
+  if (kind === "armored") {
+    return {
+      type: "armored",
+      health: 110 + wave * 24,
+      speed: 36 + wave * 1.2,
+      reward: 0,
+      color: "#b2b9c9",
+      radius: 19,
+      senderName
+    };
+  }
+  if (kind === "phantom") {
+    return {
+      type: "phantom",
+      health: 40 + wave * 10,
+      speed: 136 + wave * 2.4 + offset,
+      reward: 0,
+      color: "#c49bff",
+      radius: 14,
       senderName
     };
   }
@@ -1979,7 +2102,7 @@ function buildRaidEnemy(kind, index, senderName = "") {
     type: "basic",
     health: 34 + wave * 10,
     speed: 72 + wave * 1.7 + offset,
-    reward: 8 + wave,
+    reward: 0,
     color: "#59a6ff",
     radius: 16,
     senderName
