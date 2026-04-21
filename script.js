@@ -1,5 +1,6 @@
 const CUSTOM_QUESTIONS_KEY = "scholar-siege-custom-questions";
 const MULTIPLAYER_SESSION_KEY = "scholar-siege-room-session";
+const MULTIPLAYER_RESULTS_KEY = "scholar-siege-results-snapshot";
 
 function getCustomQuestions() {
   try {
@@ -78,7 +79,7 @@ const towerCatalog = {
     ]
   },
   rapid: {
-    key: "rapid", name: "Mini Gunner", cost: 75, color: "#7dff87", damage: 8, range: 108, fireRate: 0.34, projectileSpeed: 430,
+    key: "rapid", name: "Mini Gunner", cost: 95, color: "#7dff87", damage: 8, range: 108, fireRate: 0.34, projectileSpeed: 430,
     description: "Fast shots shred light targets.",
     upgrades: [
       { cost: 50, damage: 11, range: 118, fireRate: 0.29 },
@@ -1076,7 +1077,8 @@ const UIManager = {
     this.elements.invasionList?.querySelectorAll(".invasion-card").forEach((button) => {
       const raid = multiplayerEnemyCatalog[button.dataset.kind];
       const unlocked = Game.isInvasionUnlocked(button.dataset.kind);
-      button.disabled = raidLocked || !unlocked;
+      const affordable = GameState.state.gold >= Number(raid?.cost || 0);
+      button.disabled = raidLocked || !unlocked || !affordable;
       button.classList.toggle("locked", !unlocked);
       if (raid) {
         const detail = button.querySelector(".invasion-price");
@@ -1311,6 +1313,15 @@ const MultiplayerManager = {
   maybeRedirectToResults() {
     if (!this.state.connected || !this.state.matchStartAt || this.state.resultsRedirected || GameState.state.multiplayerResultsRedirected) return;
     if (Date.now() < this.state.matchStartAt + this.state.matchDurationMs) return;
+    const players = this.state.players.map((player) => ({
+      ...player,
+      board: this.state.boards[player.id] || player.board || null
+    }));
+    sessionStorage.setItem(MULTIPLAYER_RESULTS_KEY, JSON.stringify({
+      roomId: this.state.roomId,
+      playerId: this.state.playerId,
+      players
+    }));
     this.state.resultsRedirected = true;
     GameState.state.multiplayerResultsRedirected = true;
     window.location.href = "results.html";
@@ -1816,6 +1827,10 @@ const Game = {
   requestSendEnemy(kind) {
     const raid = multiplayerEnemyCatalog[kind];
     if (!raid || !MultiplayerManager.canSendRaid()) return;
+    if (GameState.state.gold < raid.cost) {
+      UIManager.setStatus("Not enough gold to send raid");
+      return;
+    }
     if (!this.isInvasionUnlocked(kind)) {
       UIManager.setStatus(`That invasion unlocks at wave ${raid.tier * 2}`);
       return;

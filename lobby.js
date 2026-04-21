@@ -168,6 +168,8 @@ const Lobby = {
     this.elements.enterGameButton.addEventListener("click", () => this.enterGame());
     this.elements.leaveRoomButton.addEventListener("click", () => this.leaveRoom());
     this.elements.matchDurationInput.addEventListener("change", () => this.updateMatchDuration());
+    this.elements.playerNameInput.addEventListener("change", () => this.updatePlayerName());
+    this.elements.playerNameInput.addEventListener("blur", () => this.updatePlayerName());
     this.elements.matchDurationInput.addEventListener("blur", () => {
       const parsed = parseDurationInput(this.elements.matchDurationInput.value);
       if (parsed) {
@@ -281,6 +283,10 @@ const Lobby = {
     this.state.selectedMapId = snapshot.selectedMapId || MAPS[0].id;
     this.state.matchDurationMs = Number(snapshot.matchDurationMs) || DEFAULT_MATCH_DURATION_MS;
     this.state.matchStarted = Boolean(snapshot.matchStarted);
+    const self = this.state.players.find((player) => player.id === this.state.playerId);
+    if (self?.name) {
+      this.elements.playerNameInput.value = self.name;
+    }
   },
   async createRoom() {
     const name = String(this.elements.playerNameInput.value).trim() || "Player";
@@ -406,6 +412,37 @@ const Lobby = {
     }).catch(() => {
       this.elements.lobbyStatusValue.textContent = "Timer update failed";
     });
+  },
+  async updatePlayerName() {
+    const name = String(this.elements.playerNameInput.value).trim().slice(0, 24) || "Player";
+    this.elements.playerNameInput.value = name;
+    if (!this.state.connected || !this.state.roomId || !this.state.playerId) return;
+
+    const response = await fetch(this.apiPath("/join"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId: this.state.roomId,
+        name,
+        playerId: this.state.playerId,
+        matchDurationMs: this.state.matchDurationMs
+      })
+    }).catch(() => null);
+
+    if (!response) {
+      this.elements.lobbyStatusValue.textContent = "Could not update name";
+      return;
+    }
+
+    const payload = await response.json();
+    if (!response.ok) {
+      this.elements.lobbyStatusValue.textContent = payload.error || "Could not update name";
+      return;
+    }
+
+    this.applySnapshot(payload);
+    this.saveSession({ roomId: payload.roomId, name, playerId: payload.playerId });
+    this.updateUI();
   },
   async leaveRoom() {
     if (!this.state.connected) return;
