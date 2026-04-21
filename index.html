@@ -10,11 +10,11 @@
   <div class="app-shell">
     <div class="top-nav">
       <div class="top-nav-left">
-        <a id="openQuestionEditorButton" class="secondary-button shortcut-link" href="questions.html" target="_blank" rel="noopener">Open Question Editor</a>
+        <a id="openQuestionEditorButton" class="secondary-button shortcut-link" href="questions.html">Open Question Editor</a>
         <button id="spectateButton" class="secondary-button shortcut-link hidden" type="button">Spectate</button>
       </div>
       <div id="roomCodeBanner" class="room-code-banner hidden" aria-live="polite">Room Code: ----</div>
-      <a id="openLobbyScreenButton" class="secondary-button shortcut-link" href="lobby.html" target="_blank" rel="noopener">Open Lobby Screen</a>
+      <a id="openLobbyScreenButton" class="secondary-button shortcut-link" href="lobby.html">Open Lobby Screen</a>
     </div>
     <header class="top-bar">
       <div class="stat-card"><span class="stat-label">Gold</span><strong id="goldValue">120</strong></div>
@@ -27,6 +27,7 @@
       <section class="playfield-panel">
         <div class="canvas-frame">
           <canvas id="gameCanvas" width="960" height="540"></canvas>
+          <div id="selectedTowerPanel" class="selected-panel floating hidden" aria-live="polite"></div>
           <div id="pausedOverlay" class="overlay hidden">
             <div class="overlay-card">
               <h2>Paused</h2>
@@ -64,6 +65,42 @@
           <ul id="boardHealthList" class="board-health-list">
             <li class="board-health-empty">Join a room from the lobby to see everyone's health here.</li>
           </ul>
+        </section>
+
+        <section class="panel multiplayer-panel compact-multiplayer-panel inline-room-panel">
+          <div class="panel-header">
+            <h2>Room Controls</h2>
+            <p>Use the separate lobby screen to create a room, see the roster, and then jump into the match.</p>
+          </div>
+          <div class="multiplayer-grid">
+            <div class="multiplayer-card">
+              <h3>Current Session</h3>
+              <div class="button-row compact">
+                <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
+              </div>
+              <div class="multiplayer-status-list">
+                <div><span>Connection</span><strong id="multiplayerStatus">Offline</strong></div>
+                <div><span>Status</span><strong id="roomStatusValue">No Room</strong></div>
+                <div><span>Room</span><strong id="currentRoomName">Open Lobby</strong></div>
+                <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
+                <div><span>Question Set</span><strong id="questionSourceValue">No questions</strong></div>
+              </div>
+            </div>
+
+            <div class="multiplayer-card">
+              <h3>How To Play</h3>
+              <ul class="info-list">
+                <li>Only your custom-made questions are used in the game.</li>
+                <li>Correct answers earn gold and activate tower and ability purchases.</li>
+                <li>Farm Towers boost question rewards for the whole run.</li>
+                <li>Sniper Towers hit hard across nearly the whole map.</li>
+                <li>Every wave now has a 10-second countdown before it begins.</li>
+                <li>Enemy invasions unlock every 2 waves.</li>
+                <li>Each new match begins with a map selection.</li>
+                <li>If an enemy reaches the base, you lose HP equal to its remaining health.</li>
+              </ul>
+            </div>
+          </div>
         </section>
       </section>
 
@@ -109,17 +146,6 @@
 
         <section class="panel">
           <div class="panel-header">
-            <h2>Selected Tower</h2>
-            <p>Upgrade or sell your placed tower.</p>
-          </div>
-          <div id="selectedTowerPanel" class="selected-panel empty">
-            <p>Select a tower on the map.</p>
-          </div>
-          <button id="quickSellButton" class="danger-button panel-action-button" disabled>Sell Selected Tower</button>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
             <h2>Send Enemies</h2>
             <p>Answer a question, spend gold, and unlock stronger invasions every 2 waves.</p>
           </div>
@@ -132,50 +158,9 @@
           </details>
         </section>
       </aside>
+
     </main>
 
-    <section class="multiplayer-section">
-      <div class="multiplayer-panel">
-        <div class="panel-header">
-          <h2>Room Controls</h2>
-          <p>Use the separate lobby screen to create a room, see the roster, and then jump into the match.</p>
-        </div>
-        <div class="multiplayer-grid">
-          <div class="multiplayer-card">
-            <h3>Current Session</h3>
-            <div class="button-grid">
-              <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
-            </div>
-            <div class="multiplayer-status-list">
-              <div><span>Connection</span><strong id="multiplayerStatus">Offline</strong></div>
-              <div><span>Status</span><strong id="roomStatusValue">No Room</strong></div>
-              <div><span>Room</span><strong id="currentRoomName">Open Lobby</strong></div>
-              <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
-              <div><span>Question Set</span><strong id="questionSourceValue">No questions</strong></div>
-            </div>
-          </div>
-
-          <div class="multiplayer-card">
-            <h3>Question Ownership</h3>
-            <p class="multiplayer-copy">The first player to join becomes the host. Everyone in that room uses the host's custom question bank, and when the host starts the match the whole room starts together.</p>
-          </div>
-
-          <div class="multiplayer-card">
-            <h3>How To Play</h3>
-            <ul class="info-list">
-              <li>Only your custom-made questions are used in the game.</li>
-              <li>Correct answers earn gold and activate tower and ability purchases.</li>
-              <li>Farm Towers boost question rewards for the whole run.</li>
-              <li>Sniper Towers hit hard across nearly the whole map.</li>
-              <li>Every wave now has a 10-second countdown before it begins.</li>
-              <li>Enemy invasions unlock every 2 waves.</li>
-              <li>Each new match begins with a map selection.</li>
-              <li>If an enemy reaches the base, you lose HP equal to its remaining health.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </section>
   </div>
 
   <div id="questionModal" class="modal hidden" aria-hidden="true">

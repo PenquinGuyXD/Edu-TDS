@@ -159,6 +159,10 @@ label span,
   display: grid;
   gap: 10px;
   margin-top: 14px;
+  max-height: min(56vh, 500px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
 }
 
 .map-card {
@@ -169,6 +173,15 @@ label span,
   padding: 12px;
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
+}
+.map-card-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+}
+.map-card-copy {
+  min-width: 0;
 }
 
 .map-card.selected {
@@ -185,6 +198,15 @@ label span,
   margin-top: 6px;
   color: var(--muted);
   line-height: 1.4;
+}
+.map-preview {
+  width: 120px;
+  height: 78px;
+  display: block;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .room-player-item {

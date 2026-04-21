@@ -4,19 +4,102 @@ const MAPS = [
   {
     id: "meadow-pass",
     name: "Meadow Pass",
-    description: "A winding grassland route with lots of mid-range tower spots."
+    description: "A winding grassland route with lots of mid-range tower spots.",
+    pathWidth: 64,
+    pathOuter: "#a88a68",
+    pathInner: "#d4bb96",
+    points: [
+      { x: 0, y: 98 }, { x: 164, y: 98 }, { x: 164, y: 220 }, { x: 356, y: 220 }, { x: 356, y: 132 },
+      { x: 598, y: 132 }, { x: 598, y: 332 }, { x: 774, y: 332 }, { x: 774, y: 442 }, { x: 960, y: 442 }
+    ]
   },
   {
     id: "canyon-switchback",
     name: "Canyon Switchback",
-    description: "A tighter set of turns that rewards quick reactions and layered fire."
+    description: "A tighter set of turns that rewards quick reactions and layered fire.",
+    pathWidth: 60,
+    pathOuter: "#8c5b42",
+    pathInner: "#d7a276",
+    points: [
+      { x: 0, y: 430 }, { x: 158, y: 430 }, { x: 158, y: 338 }, { x: 310, y: 338 }, { x: 310, y: 460 },
+      { x: 520, y: 460 }, { x: 520, y: 182 }, { x: 712, y: 182 }, { x: 712, y: 72 }, { x: 960, y: 72 }
+    ]
   },
   {
     id: "frost-arc",
     name: "Frost Arc",
-    description: "Long lanes and sweeping bends create perfect sniper sightlines."
+    description: "Long lanes and sweeping bends create perfect sniper sightlines.",
+    pathWidth: 68,
+    pathOuter: "#7ca4b4",
+    pathInner: "#bed7dd",
+    points: [
+      { x: 0, y: 170 }, { x: 230, y: 170 }, { x: 230, y: 78 }, { x: 454, y: 78 }, { x: 454, y: 266 },
+      { x: 670, y: 266 }, { x: 670, y: 430 }, { x: 826, y: 430 }, { x: 826, y: 302 }, { x: 960, y: 302 }
+    ]
+  },
+  {
+    id: "crossover-circuit",
+    name: "Crossover Circuit",
+    description: "A crossing central lane that bends into a rounded right-side loop.",
+    pathWidth: 64,
+    pathOuter: "#7f8ea6",
+    pathInner: "#cad4e4",
+    points: [
+      { x: 0, y: 132 }, { x: 510, y: 132 }, { x: 670, y: 332 }, { x: 820, y: 468 }, { x: 930, y: 456 },
+      { x: 960, y: 396 }, { x: 900, y: 290 }, { x: 832, y: 110 }, { x: 676, y: 108 }, { x: 450, y: 318 },
+      { x: 226, y: 480 }, { x: 0, y: 480 }
+    ]
   }
 ];
+
+function createMapPreviewDataUri(map) {
+  const width = 120;
+  const height = 78;
+  const scaleX = width / 960;
+  const scaleY = height / 540;
+  const points = map.points.map((point) => `${(point.x * scaleX).toFixed(1)},${(point.y * scaleY).toFixed(1)}`).join(" ");
+  const innerWidth = Math.max(8, (map.pathWidth - 18) * ((scaleX + scaleY) / 2));
+  const outerWidth = Math.max(innerWidth + 6, map.pathWidth * ((scaleX + scaleY) / 2));
+  const prev = map.points[map.points.length - 2] || map.points[0];
+  const end = map.points[map.points.length - 1];
+  const endX = end.x * scaleX;
+  const endY = end.y * scaleY;
+  const dx = end.x - prev.x;
+  const dy = end.y - prev.y;
+  const segmentLength = Math.max(1, Math.hypot(dx, dy));
+  const normalX = (-dy / segmentLength) * scaleX;
+  const normalY = (dx / segmentLength) * scaleY;
+  const normalLength = Math.max(0.001, Math.hypot(normalX, normalY));
+  const unitNormalX = normalX / normalLength;
+  const unitNormalY = normalY / normalLength;
+  const lineLength = outerWidth + 10;
+  const halfLine = lineLength / 2;
+  const lineThickness = 4;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#19311b"/>
+          <stop offset="100%" stop-color="#224525"/>
+        </linearGradient>
+        <linearGradient id="endGlow" x1="${(endX - unitNormalX * halfLine).toFixed(1)}" y1="${(endY - unitNormalY * halfLine).toFixed(1)}" x2="${(endX + unitNormalX * halfLine).toFixed(1)}" y2="${(endY + unitNormalY * halfLine).toFixed(1)}" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="rgba(255,83,83,0)"/>
+          <stop offset="45%" stop-color="rgba(255,83,83,0.35)"/>
+          <stop offset="100%" stop-color="#ff5353"/>
+        </linearGradient>
+      </defs>
+      <rect width="${width}" height="${height}" rx="12" fill="url(#bg)"/>
+      <g opacity="0.12" stroke="#ffffff" stroke-width="0.8">
+        ${Array.from({ length: 8 }, (_, i) => `<line x1="0" y1="${i * 13}" x2="${width}" y2="${i * 13}"/>`).join("")}
+        ${Array.from({ length: 10 }, (_, i) => `<line x1="${i * 13}" y1="0" x2="${i * 13}" y2="${height}"/>`).join("")}
+      </g>
+      <polyline points="${points}" fill="none" stroke="${map.pathOuter}" stroke-linecap="round" stroke-linejoin="round" stroke-width="${outerWidth.toFixed(1)}"/>
+      <polyline points="${points}" fill="none" stroke="${map.pathInner}" stroke-linecap="round" stroke-linejoin="round" stroke-width="${innerWidth.toFixed(1)}"/>
+      <line x1="${(endX - unitNormalX * halfLine).toFixed(1)}" y1="${(endY - unitNormalY * halfLine).toFixed(1)}" x2="${(endX + unitNormalX * halfLine).toFixed(1)}" y2="${(endY + unitNormalY * halfLine).toFixed(1)}" stroke="url(#endGlow)" stroke-width="${lineThickness}" stroke-linecap="round"/>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 const Lobby = {
   state: {
@@ -106,7 +189,15 @@ const Lobby = {
       const button = document.createElement("button");
       button.type = "button";
       button.className = `map-card${this.state.selectedMapId === map.id ? " selected" : ""}`;
-      button.innerHTML = `<h3>${map.name}</h3><p>${map.description}</p>`;
+      button.innerHTML = `
+        <div class="map-card-layout">
+          <div class="map-card-copy">
+            <h3>${map.name}</h3>
+            <p>${map.description}</p>
+          </div>
+          <img class="map-preview" src="${createMapPreviewDataUri(map)}" alt="${map.name} preview" />
+        </div>
+      `;
       button.disabled = !this.isHost() || this.state.matchStarted;
       button.addEventListener("click", () => this.selectMap(map.id));
       list.appendChild(button);

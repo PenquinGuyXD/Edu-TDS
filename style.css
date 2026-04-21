@@ -127,10 +127,22 @@ canvas {
 }
 .hidden { display: none !important; }
 .sidebar { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.inline-room-panel {
+  margin-top: 2px;
+}
 .panel { border-radius: 18px; padding: 12px; }
 .panel-header h2 { margin: 0 0 3px; font-size: 0.98rem; }
 .panel-header p { margin: 0 0 8px; color: var(--muted); line-height: 1.3; font-size: 0.84rem; }
 .button-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.button-row.compact {
+  display: flex;
+  justify-content: flex-start;
+}
+.button-row.compact button {
+  width: auto;
+  min-width: 112px;
+  padding-inline: 16px;
+}
 .primary-button { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #062116; }
 .secondary-button { background: linear-gradient(135deg, #d5e4ff, #adc5f5); color: #102445; }
 .danger-button { background: linear-gradient(135deg, #ff8a8a, var(--danger)); color: #310708; }
@@ -256,6 +268,25 @@ canvas {
 .tower-details span { padding: 7px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 0.84rem; }
 .selected-panel { min-height: 152px; display: grid; gap: 8px; }
 .selected-panel.empty { place-items: center; text-align: center; border: 1px dashed rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 14px; }
+.selected-panel.floating {
+  position: absolute;
+  min-height: 0;
+  width: min(250px, calc(100% - 24px));
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(10, 18, 33, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.32);
+  z-index: 6;
+}
+.selected-panel.floating h3 {
+  font-size: 0.92rem;
+}
+.selected-panel.floating p,
+.selected-panel.floating .tower-stats span,
+.selected-panel.floating .upgrade-preview span {
+  font-size: 0.8rem;
+}
 .selected-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .panel-action-button { width: 100%; margin-top: 8px; }
 .info-list { padding-left: 16px; }
@@ -309,41 +340,34 @@ canvas {
   color: var(--muted);
   font-size: 0.82rem;
 }
-.multiplayer-section {
-  display: grid;
-  gap: 12px;
-  margin-top: 14px;
-  padding-bottom: 20px;
-}
 .multiplayer-panel {
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(16px);
-  padding: 14px;
+  padding: 12px;
+}
+.compact-multiplayer-panel .panel-header p {
+  font-size: 0.8rem;
+  margin-bottom: 6px;
 }
 .multiplayer-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 .multiplayer-card {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 10px;
   background: rgba(255, 255, 255, 0.03);
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .multiplayer-card h3 {
   margin: 0;
-  font-size: 0.96rem;
+  font-size: 0.9rem;
 }
 .multiplayer-copy {
   margin: 0;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   line-height: 1.35;
 }
 .multiplayer-form {
@@ -366,13 +390,13 @@ canvas {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
 }
 .multiplayer-status-list.compact div {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
 }
 .enemy-send-grid {
   display: grid;
@@ -392,9 +416,9 @@ canvas {
 }
 .invasion-card {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
+  grid-template-columns: 12px minmax(0, 1fr);
   gap: 4px 8px;
-  align-items: center;
+  align-items: start;
   text-align: left;
   border-radius: 12px;
   padding: 8px 10px;
@@ -405,14 +429,27 @@ canvas {
 .invasion-card strong {
   font-size: 0.86rem;
 }
-.invasion-card span:nth-of-type(2),
-.invasion-card span:nth-of-type(3),
-.invasion-card span:nth-of-type(4) {
+.invasion-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.invasion-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+.invasion-price,
+.invasion-tier,
+.invasion-description {
   font-size: 0.74rem;
   color: var(--muted);
 }
-.invasion-card span:nth-of-type(4) {
-  grid-column: 2 / 4;
+.invasion-price {
+  color: var(--gold);
+  font-weight: 700;
+  white-space: nowrap;
 }
 .invasion-card.locked {
   opacity: 0.65;
@@ -424,7 +461,16 @@ canvas {
   background: var(--raid-color, #fff);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--raid-color, #fff) 20%, transparent);
 }
-.map-selection-list { display: grid; gap: 10px; margin: 14px 0; text-align: left; }
+.map-selection-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  text-align: left;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
 .map-card {
   width: 100%;
   text-align: left;
@@ -436,6 +482,15 @@ canvas {
   cursor: pointer;
   transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
 }
+.map-card-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+}
+.map-card-copy {
+  min-width: 0;
+}
 .map-card:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: rgba(255, 207, 93, 0.45);
@@ -446,6 +501,16 @@ canvas {
 }
 .map-card h3 { margin: 0 0 6px; font-size: 0.96rem; }
 .map-card p { margin: 0; color: var(--muted); font-size: 0.86rem; line-height: 1.35; }
+.map-preview {
+  width: 120px;
+  height: 78px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  display: block;
+  object-fit: cover;
+  background: rgba(255,255,255,0.03);
+  overflow: hidden;
+}
 .map-meta { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .map-meta span {
   padding: 6px 8px;
@@ -471,7 +536,6 @@ canvas {
   .main-layout { grid-template-columns: 1fr; }
   .sidebar { order: 2; }
   .board-health-list { grid-template-columns: 1fr; }
-  .multiplayer-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
