@@ -38,6 +38,13 @@ function clearMultiplayerSession() {
   sessionStorage.removeItem(MULTIPLAYER_SESSION_KEY);
 }
 
+function formatDuration(seconds) {
+  const whole = Math.max(0, Math.ceil(seconds));
+  const minutes = Math.floor(whole / 60);
+  const remaining = whole % 60;
+  return `${minutes}:${String(remaining).padStart(2, "0")}`;
+}
+
 function refreshQuestionBank() {
   if (typeof MultiplayerManager !== "undefined" && MultiplayerManager.state.connected) {
     questions = MultiplayerManager.getQuestionBank();
@@ -275,7 +282,8 @@ const GameState = {
       abilityCooldowns: { bomb: 0, freeze: 0 },
       hoverPoint: { x: 0, y: 0, inside: false },
       spectatedPlayerId: null,
-      waveButtonCooldownUntil: 0
+      waveButtonCooldownUntil: 0,
+      multiplayerResultsRedirected: false
     };
   },
   reset() {
@@ -715,10 +723,12 @@ const QuestionManager = {
   timeRemaining: 0,
   intervalId: null,
   pendingCallback: null,
+  openedAt: 0,
   reset() {
     this.activeQuestion = null;
     this.timeRemaining = 0;
     this.pendingCallback = null;
+    this.openedAt = 0;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -737,6 +747,7 @@ const QuestionManager = {
     this.pendingCallback = callback;
     this.activeQuestion = questions[Math.floor(Math.random() * questions.length)];
     this.timeRemaining = 10;
+    this.openedAt = performance.now();
     UIManager.showQuestionModal(this.activeQuestion, this.timeRemaining);
     this.startTimer();
     return true;
@@ -760,6 +771,7 @@ const QuestionManager = {
     const question = this.activeQuestion;
     const questionContext = normalizeQuestionContext(GameState.state.questionGate);
     const multiplier = GameState.getFarmMultiplier();
+    const responseMs = this.openedAt ? Math.max(0, Math.round(performance.now() - this.openedAt)) : 0;
     let reward = 0;
     let penalty = 0;
 
@@ -784,11 +796,15 @@ const QuestionManager = {
       }
       GameState.state.isQuestionOpen = false;
       const cb = this.pendingCallback;
-      const payload = { correct, reward, penalty, context: questionContext };
+      const payload = { correct, reward, penalty, context: questionContext, responseMs };
       this.activeQuestion = null;
       this.pendingCallback = null;
+      this.openedAt = 0;
       GameState.state.questionGate = null;
       UIManager.hideQuestionModal();
+      if (MultiplayerManager.state.connected) {
+        MultiplayerManager.reportQuestionStats(correct, responseMs);
+      }
       if (cb) cb(payload);
       UIManager.updateAll();
     }, 550);
@@ -797,12 +813,17 @@ const QuestionManager = {
 
 const UIManager = {
   elements: {},
+  lastHealthRenderKey: "",
+  lastSpectatorRenderKey: "",
   init() {
     this.elements = {
       hpValue: document.getElementById("hpValue"),
       goldValue: document.getElementById("goldValue"),
       waveValue: document.getElementById("waveValue"),
       multiplierValue: document.getElementById("multiplierValue"),
+      matchTimerCard: document.getElementById("matchTimerCard"),
+      matchTimerValue: document.getElementById("matchTimerValue"),
+      topBar: document.querySelector(".top-bar"),
       statusValue: document.getElementById("statusValue"),
       towerShop: document.getElementById("towerShop"),
       openQuestionEditorButton: document.getElementById("openQuestionEditorButton"),
@@ -844,7 +865,8 @@ const UIManager = {
       questionFeedback: document.getElementById("questionFeedback"),
       questionTimerText: document.getElementById("questionTimerText"),
       questionTimerFill: document.getElementById("questionTimerFill"),
-      restartModal: document.getElementById("restartModal")
+      restartModal: document.getElementById("restartModal"),
+      topNav: document.querySelector(".top-nav")
     };
     this.renderTowerShop();
     this.renderInvasionPanel();
@@ -935,9 +957,35 @@ const UIManager = {
     });
   },
   renderBoardHealth() {
+    const key = JSON.stringify({
+      connected: MultiplayerManager.state.connected,
+      spectating: GameState.isMultiplayerSpectating(),
+      selected: GameState.state.spectatedPlayerId,
+      players: MultiplayerManager.state.players.map((player) => ({
+        id: player.id,
+        hp: player.hp ?? null,
+        wave: MultiplayerManager.state.boards[player.id]?.wave ?? player.board?.wave ?? null,
+        hasBoard: Boolean(MultiplayerManager.state.boards[player.id] || player.board)
+      }))
+    });
+    if (key === this.lastHealthRenderKey) return;
+    this.lastHealthRenderKey = key;
     this.renderPlayerHealthList(this.elements.boardHealthList, "Join a room from the lobby to see everyone's health here.");
   },
   renderSpectatorHealth() {
+    const key = JSON.stringify({
+      connected: MultiplayerManager.state.connected,
+      spectating: GameState.isMultiplayerSpectating(),
+      selected: GameState.state.spectatedPlayerId,
+      players: MultiplayerManager.state.players.map((player) => ({
+        id: player.id,
+        hp: player.hp ?? null,
+        wave: MultiplayerManager.state.boards[player.id]?.wave ?? player.board?.wave ?? null,
+        hasBoard: Boolean(MultiplayerManager.state.boards[player.id] || player.board)
+      }))
+    });
+    if (key === this.lastSpectatorRenderKey) return;
+    this.lastSpectatorRenderKey = key;
     this.renderPlayerHealthList(this.elements.spectatorHealthList, "Waiting for room updates...");
   },
   renderPlayerHealthList(list, emptyText) {
@@ -990,6 +1038,9 @@ const UIManager = {
     this.elements.goldValue.textContent = gold;
     this.elements.waveValue.textContent = wave;
     this.elements.multiplierValue.textContent = `${GameState.getFarmMultiplier().toFixed(2)}x`;
+    this.elements.matchTimerCard.classList.toggle("hidden", !MultiplayerManager.state.connected || !MultiplayerManager.state.matchStartAt);
+    this.elements.matchTimerValue.textContent = MultiplayerManager.getMatchTimerLabel();
+    this.elements.topBar?.classList.toggle("solo-mode", !MultiplayerManager.state.connected || !MultiplayerManager.state.matchStartAt);
     this.elements.pauseButton.textContent = isPaused ? "Resume" : "Pause";
     this.elements.pausedOverlay.classList.toggle("hidden", !isPaused || isGameOver);
     this.elements.startMatchButton.disabled = MultiplayerManager.state.connected && !MultiplayerManager.isHost();
@@ -1006,6 +1057,7 @@ const UIManager = {
     this.elements.pauseButton.classList.toggle("hidden", onlineMatch);
     this.elements.restartButton.classList.toggle("hidden", onlineMatch && !isGameOver);
     this.elements.spectateButton.classList.toggle("hidden", !GameState.isMultiplayerSpectating());
+    this.elements.topNav?.classList.toggle("solo-mode", !MultiplayerManager.state.connected);
     this.elements.multiplayerStatus.textContent = MultiplayerManager.state.connected ? "Connected" : "Offline";
     this.elements.roomStatusValue.textContent = MultiplayerManager.state.connected ? "In Room" : "No Room";
     this.elements.currentRoomName.textContent = MultiplayerManager.state.roomId || "Open Lobby";
@@ -1210,13 +1262,17 @@ const MultiplayerManager = {
     hostQuestions: [],
     selectedMapId: MAPS[0].id,
     matchStarted: false,
+    matchStartAt: null,
+    matchDurationMs: 5 * 60 * 1000,
     opponent: null,
     boards: {},
     eventSource: null,
     lastSentHp: null,
     lastSentGold: null,
     lastSentBoard: null,
-    lastBoardSentAt: 0
+    lastBoardSentAt: 0,
+    lastQuestionsHash: "",
+    resultsRedirected: false
   },
   init() {
     const session = loadMultiplayerSession();
@@ -1243,6 +1299,21 @@ const MultiplayerManager = {
   getQuestionSourceLabel() {
     if (!this.state.connected) return questions.length ? "Local custom set" : "No questions";
     return this.isHost() ? "Your custom set" : "Host custom set";
+  },
+  getMatchTimerSecondsRemaining() {
+    if (!this.state.connected || !this.state.matchStartAt) return null;
+    return Math.max(0, (this.state.matchStartAt + this.state.matchDurationMs - Date.now()) / 1000);
+  },
+  getMatchTimerLabel() {
+    const remaining = this.getMatchTimerSecondsRemaining();
+    return remaining == null ? "5:00" : formatDuration(remaining);
+  },
+  maybeRedirectToResults() {
+    if (!this.state.connected || !this.state.matchStartAt || this.state.resultsRedirected || GameState.state.multiplayerResultsRedirected) return;
+    if (Date.now() < this.state.matchStartAt + this.state.matchDurationMs) return;
+    this.state.resultsRedirected = true;
+    GameState.state.multiplayerResultsRedirected = true;
+    window.location.href = "results.html";
   },
   getQuestionBank() {
     if (this.state.connected && !this.isHost()) {
@@ -1286,6 +1357,8 @@ const MultiplayerManager = {
       this.state.players = Array.isArray(payload.players) ? payload.players : [];
       this.state.selectedMapId = payload.selectedMapId || MAPS[0].id;
       this.state.matchStarted = Boolean(payload.matchStarted);
+      this.state.matchStartAt = payload.matchStartAt || null;
+      this.state.matchDurationMs = payload.matchDurationMs || this.state.matchDurationMs;
       GameState.state.isPaused = false;
       this.state.boards = Object.fromEntries((Array.isArray(payload.players) ? payload.players : []).map((player) => [player.id, player.board || null]));
       this.state.side = this.isHost() ? "host" : "player";
@@ -1336,13 +1409,17 @@ const MultiplayerManager = {
       hostQuestions: [],
       selectedMapId: MAPS[0].id,
       matchStarted: false,
+      matchStartAt: null,
+      matchDurationMs: 5 * 60 * 1000,
       opponent: null,
       boards: {},
       eventSource: null,
       lastSentHp: null,
       lastSentGold: null,
       lastSentBoard: null,
-      lastBoardSentAt: 0
+      lastBoardSentAt: 0,
+      lastQuestionsHash: "",
+      resultsRedirected: false
     };
   },
   openEventStream() {
@@ -1363,8 +1440,11 @@ const MultiplayerManager = {
     this.state.boards = Object.fromEntries(this.state.players.map((player) => [player.id, player.board || null]));
     this.state.selectedMapId = snapshot.selectedMapId || this.state.selectedMapId;
     this.state.matchStarted = Boolean(snapshot.matchStarted);
+    this.state.matchStartAt = snapshot.matchStartAt || this.state.matchStartAt;
+    this.state.matchDurationMs = snapshot.matchDurationMs || this.state.matchDurationMs;
     this.state.side = this.isHost() ? "host" : "player";
     this.updateOpponent();
+    this.ensureSpectatorTarget();
   },
   handleEvent(event) {
     if (event.type === "room_update") {
@@ -1424,8 +1504,18 @@ const MultiplayerManager = {
 
     if (event.type === "board_update") {
       this.state.boards[event.sender] = event.payload || null;
+      this.ensureSpectatorTarget();
       UIManager.updateAll();
     }
+  },
+  ensureSpectatorTarget() {
+    if (!GameState.isMultiplayerSpectating()) return;
+    const hasCurrent = Boolean(GameState.state.spectatedPlayerId && this.state.boards[GameState.state.spectatedPlayerId]);
+    if (hasCurrent) return;
+    const fallbackPlayer = this.state.players.find((player) => player.id !== this.state.playerId && this.state.boards[player.id])
+      || this.state.players.find((player) => this.state.boards[player.id])
+      || null;
+    GameState.state.spectatedPlayerId = fallbackPlayer ? fallbackPlayer.id : null;
   },
   updateOpponent() {
     this.state.opponent = this.state.players.find((player) => player.id !== this.state.playerId) || null;
@@ -1449,6 +1539,13 @@ const MultiplayerManager = {
   async syncHostQuestions() {
     if (!this.isHost()) return;
     const localQuestions = getCustomQuestions();
+    const hash = JSON.stringify(localQuestions);
+    if (hash === this.state.lastQuestionsHash) {
+      this.state.hostQuestions = localQuestions;
+      refreshQuestionBank();
+      return;
+    }
+    this.state.lastQuestionsHash = hash;
     this.state.hostQuestions = localQuestions;
     refreshQuestionBank();
     await this.relay("host_questions", {
@@ -1459,6 +1556,13 @@ const MultiplayerManager = {
   async broadcastMatchStart(mapId) {
     if (!this.state.connected) return;
     await this.relay("start_match", { mapId });
+  },
+  async reportQuestionStats(correct, responseMs) {
+    if (!this.state.connected) return;
+    await this.relay("question_stats", {
+      correct: Boolean(correct),
+      responseMs: Math.max(0, Math.round(responseMs || 0))
+    });
   },
   async sendRaid(kind) {
     const entry = multiplayerEnemyCatalog[kind];
@@ -1601,6 +1705,7 @@ const Game = {
     const roomMapId = MultiplayerManager.state.selectedMapId || MAPS[0].id;
     GameState.reset();
     GameState.state.currentMapId = roomMapId;
+    GameState.state.multiplayerResultsRedirected = false;
     UIManager.renderMapSelection();
     UIManager.hideRestartModal();
     UIManager.hideGameOver();
@@ -1608,6 +1713,7 @@ const Game = {
     MultiplayerManager.reportHealth(true);
     MultiplayerManager.reportGold(true);
     MultiplayerManager.reportBoard(true);
+    MultiplayerManager.relay("reset_run", { board: this.buildBoardSnapshot() });
     UIManager.updateAll();
   },
   getUnlockedInvasionTier() {
@@ -1639,6 +1745,8 @@ const Game = {
     }
     if (MultiplayerManager.state.connected) {
       GameState.state.isPaused = false;
+      MultiplayerManager.state.resultsRedirected = false;
+      GameState.state.multiplayerResultsRedirected = false;
     }
     GameState.state.isPreMatch = false;
     UIManager.hidePreMatch();
@@ -1942,11 +2050,15 @@ const Game = {
     MultiplayerManager.reportHealth();
     MultiplayerManager.reportGold();
     MultiplayerManager.reportBoard();
+    MultiplayerManager.maybeRedirectToResults();
     UIManager.updateAll();
   },
   draw() {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    if (GameState.isMultiplayerSpectating()) {
+      MultiplayerManager.ensureSpectatorTarget();
+    }
     const spectatedBoard = GameState.isMultiplayerSpectating()
       ? MultiplayerManager.state.boards[GameState.state.spectatedPlayerId] || null
       : null;

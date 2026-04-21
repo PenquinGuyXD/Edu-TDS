@@ -74,7 +74,26 @@ button:disabled {
 
 .app-shell { max-width: 1460px; margin: 0 auto; padding: 10px; display: flex; flex-direction: column; }
 .top-nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-bottom: 12px; }
-.top-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.top-nav.solo-mode {
+  grid-template-columns: 1fr 1fr;
+}
+.top-nav.solo-mode .top-nav-left {
+  width: 100%;
+}
+.top-nav.solo-mode .top-nav-left .shortcut-link {
+  width: 100%;
+}
+.top-nav.solo-mode #openLobbyScreenButton {
+  width: 100%;
+  justify-self: stretch;
+}
+.top-nav.solo-mode #roomCodeBanner {
+  display: none !important;
+}
+.top-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.top-bar.solo-mode {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .room-code-banner {
   justify-self: center;
   min-width: 220px;

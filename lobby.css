@@ -165,6 +165,16 @@ label span,
   padding-right: 6px;
 }
 
+.timer-config-row {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.timer-config-label {
+  width: min(220px, 100%);
+}
+
 .map-card {
   width: 100%;
   text-align: left;

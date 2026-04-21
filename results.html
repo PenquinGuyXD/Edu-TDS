@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match Results</title>
+  <link rel="stylesheet" href="results.css">
+</head>
+<body>
+  <main class="results-shell">
+    <section class="results-hero">
+      <p class="eyebrow">Multiplayer Results</p>
+      <h1>Winners Circle</h1>
+      <p id="resultsRoomLabel" class="hero-copy">Loading room results...</p>
+    </section>
+
+    <section class="results-panel">
+      <div class="panel-header">
+        <h2>Standings</h2>
+        <p>Accuracy is shown as the ring around each percentage. Response time is the average per answer.</p>
+      </div>
+      <div id="resultsList" class="results-list"></div>
+    </section>
+
+    <div class="results-actions">
+      <a class="results-link" href="lobby.html">Back To Lobby</a>
+      <a class="results-link secondary" href="index.html">Back To Game</a>
+    </div>
+  </main>
+
+  <script src="results.js"></script>
+</body>
+</html>

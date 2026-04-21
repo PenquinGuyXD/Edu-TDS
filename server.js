@@ -8,6 +8,9 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const MAX_ROOM_PLAYERS = 50;
 const DEFAULT_MAP_ID = "meadow-pass";
+const DEFAULT_MATCH_DURATION_MS = 5 * 60 * 1000;
+const MIN_MATCH_DURATION_MS = 60 * 1000;
+const MAX_MATCH_DURATION_MS = 60 * 60 * 1000;
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -69,6 +72,11 @@ function sanitizeQuestions(rawQuestions) {
     .slice(0, 500);
 }
 
+function sanitizeMatchDuration(value) {
+  const numeric = Math.round(Number(value) || DEFAULT_MATCH_DURATION_MS);
+  return Math.max(MIN_MATCH_DURATION_MS, Math.min(MAX_MATCH_DURATION_MS, numeric));
+}
+
 function getOrCreateRoom(roomId) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
@@ -79,12 +87,23 @@ function getOrCreateRoom(roomId) {
       hostQuestions: [],
       playerHealths: {},
       playerGolds: {},
+      playerStats: {},
       playerBoards: {},
       selectedMapId: DEFAULT_MAP_ID,
-      matchStarted: false
+      matchStarted: false,
+      matchStartAt: null,
+      matchDurationMs: DEFAULT_MATCH_DURATION_MS
     });
   }
   return rooms.get(roomId);
+}
+
+function createDefaultStats() {
+  return {
+    answered: 0,
+    correct: 0,
+    totalResponseMs: 0
+  };
 }
 
 function getPlayer(room, playerId) {
@@ -108,6 +127,9 @@ function normalizeRoom(room) {
     if (typeof room.playerGolds[player.id] !== "number") {
       room.playerGolds[player.id] = 120;
     }
+    if (!room.playerStats[player.id] || typeof room.playerStats[player.id] !== "object") {
+      room.playerStats[player.id] = createDefaultStats();
+    }
   });
 }
 
@@ -119,12 +141,15 @@ function buildRoomSnapshot(room) {
     hostQuestions: room.hostQuestions,
     selectedMapId: room.selectedMapId,
     matchStarted: room.matchStarted,
+    matchStartAt: room.matchStartAt,
+    matchDurationMs: sanitizeMatchDuration(room.matchDurationMs),
     players: room.players.map((player) => ({
       id: player.id,
       name: player.name,
       side: player.side,
       hp: typeof room.playerHealths[player.id] === "number" ? room.playerHealths[player.id] : null,
       gold: typeof room.playerGolds[player.id] === "number" ? room.playerGolds[player.id] : null,
+      stats: room.playerStats[player.id] || createDefaultStats(),
       board: room.playerBoards[player.id] || null
     }))
   };
@@ -154,6 +179,9 @@ function handleJoin(req, res, body) {
   }
 
   const room = getOrCreateRoom(roomId);
+  if (!room.players.length) {
+    room.matchDurationMs = sanitizeMatchDuration(body.matchDurationMs);
+  }
   const existingPlayer = requestedPlayerId ? getPlayer(room, requestedPlayerId) : null;
   if (existingPlayer) {
     existingPlayer.name = name;
@@ -171,6 +199,8 @@ function handleJoin(req, res, body) {
       hostQuestions: room.hostQuestions,
       selectedMapId: room.selectedMapId,
       matchStarted: room.matchStarted,
+      matchStartAt: room.matchStartAt,
+      matchDurationMs: sanitizeMatchDuration(room.matchDurationMs),
       players: snapshot.players
     });
     return;
@@ -190,6 +220,7 @@ function handleJoin(req, res, body) {
   room.players.push(player);
   room.playerHealths[player.id] = 100;
   room.playerGolds[player.id] = 120;
+  room.playerStats[player.id] = createDefaultStats();
   if (room.players.length === 1) {
     room.hostId = player.id;
     room.hostQuestions = sanitizeQuestions(body.questions);
@@ -207,6 +238,8 @@ function handleJoin(req, res, body) {
     hostQuestions: room.hostQuestions,
     selectedMapId: room.selectedMapId,
     matchStarted: room.matchStarted,
+    matchStartAt: room.matchStartAt,
+    matchDurationMs: sanitizeMatchDuration(room.matchDurationMs),
     players: snapshot.players
   });
 }
@@ -221,6 +254,7 @@ function handleLeave(req, res, body) {
   room.players = room.players.filter((player) => player.id !== body.playerId);
   delete room.playerHealths[body.playerId];
   delete room.playerGolds[body.playerId];
+  delete room.playerStats[body.playerId];
   delete room.playerBoards[body.playerId];
 
   const stream = room.streams.get(body.playerId);
@@ -260,14 +294,35 @@ function handleRelay(req, res, body) {
   if (body.type === "select_map" && sender.id === room.hostId) {
     room.selectedMapId = String(payload.mapId || DEFAULT_MAP_ID).trim() || DEFAULT_MAP_ID;
   }
+  if (body.type === "select_duration" && sender.id === room.hostId && !room.matchStarted) {
+    room.matchDurationMs = sanitizeMatchDuration(payload.matchDurationMs);
+  }
   if (body.type === "lobby_start" && sender.id === room.hostId) {
     room.matchStarted = true;
+    room.matchStartAt = Date.now();
+  }
+  if (body.type === "start_match" && sender.id === room.hostId) {
+    room.matchStarted = true;
+    room.matchStartAt = Date.now();
   }
   if (body.type === "health_update") {
     room.playerHealths[sender.id] = Math.max(0, Math.min(100, Number(payload.hp) || 0));
   }
   if (body.type === "gold_update") {
     room.playerGolds[sender.id] = Math.max(0, Math.round(Number(payload.gold) || 0));
+  }
+  if (body.type === "question_stats") {
+    const stats = room.playerStats[sender.id] || createDefaultStats();
+    stats.answered += 1;
+    if (payload.correct) stats.correct += 1;
+    stats.totalResponseMs += Math.max(0, Math.round(Number(payload.responseMs) || 0));
+    room.playerStats[sender.id] = stats;
+  }
+  if (body.type === "reset_run") {
+    room.playerHealths[sender.id] = 100;
+    room.playerGolds[sender.id] = 120;
+    room.playerStats[sender.id] = createDefaultStats();
+    room.playerBoards[sender.id] = payload && typeof payload.board === "object" ? payload.board : null;
   }
   if (body.type === "board_update") {
     room.playerBoards[sender.id] = payload && typeof payload === "object" ? payload : null;
@@ -288,7 +343,16 @@ function handleRelay(req, res, body) {
   }
 
   publish(room, event);
-  if (body.type === "health_update" || body.type === "gold_update" || body.type === "select_map" || body.type === "lobby_start") {
+  if (
+    body.type === "health_update" ||
+    body.type === "gold_update" ||
+    body.type === "select_duration" ||
+    body.type === "select_map" ||
+    body.type === "lobby_start" ||
+    body.type === "start_match" ||
+    body.type === "question_stats" ||
+    body.type === "reset_run"
+  ) {
     publishRoom(room);
   }
   sendJson(res, 200, { ok: true });

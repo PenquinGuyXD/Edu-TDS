@@ -45,6 +45,7 @@
           <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
           <div><span>Players</span><strong id="roomPopulationValue">0/50</strong></div>
           <div><span>Map</span><strong id="selectedMapValue">Meadow Pass</strong></div>
+          <div><span>Timer</span><strong id="selectedTimerValue">5:00</strong></div>
           <div><span>Match</span><strong id="matchStateValue">Waiting</strong></div>
         </div>
       </section>
@@ -61,6 +62,12 @@
     <section class="lobby-card">
       <h2>Map Selection</h2>
       <p class="section-copy">Only the host can select the battlefield. Everyone must wait in the lobby until the host starts the match.</p>
+      <div class="timer-config-row">
+        <label class="timer-config-label" for="matchDurationInput">
+          <span>Match Timer</span>
+          <input id="matchDurationInput" type="text" inputmode="numeric" value="5:00" placeholder="5:00" maxlength="5">
+        </label>
+      </div>
       <div id="mapSelectionList" class="map-selection-list"></div>
     </section>
   </main>

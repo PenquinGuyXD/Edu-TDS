@@ -1,4 +1,5 @@
 const MULTIPLAYER_SESSION_KEY = "scholar-siege-room-session";
+const DEFAULT_MATCH_DURATION_MS = 5 * 60 * 1000;
 
 const MAPS = [
   {
@@ -101,6 +102,23 @@ function createMapPreviewDataUri(map) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+function formatDurationMs(durationMs) {
+  const totalSeconds = Math.max(60, Math.round((Number(durationMs) || DEFAULT_MATCH_DURATION_MS) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function parseDurationInput(value) {
+  const trimmed = String(value || "").trim();
+  const match = /^(\d{1,2})(?::([0-5]\d))?$/.exec(trimmed);
+  if (!match) return null;
+  const minutes = Number(match[1]);
+  const seconds = Number(match[2] || 0);
+  if (minutes < 1) return null;
+  return (minutes * 60 + seconds) * 1000;
+}
+
 const Lobby = {
   state: {
     connected: false,
@@ -109,6 +127,7 @@ const Lobby = {
     hostId: "",
     players: [],
     selectedMapId: MAPS[0].id,
+    matchDurationMs: DEFAULT_MATCH_DURATION_MS,
     matchStarted: false,
     eventSource: null,
     navigatingToGame: false
@@ -129,9 +148,11 @@ const Lobby = {
       playerRoleValue: document.getElementById("playerRoleValue"),
       roomPopulationValue: document.getElementById("roomPopulationValue"),
       selectedMapValue: document.getElementById("selectedMapValue"),
+      selectedTimerValue: document.getElementById("selectedTimerValue"),
       matchStateValue: document.getElementById("matchStateValue"),
       roomPlayerList: document.getElementById("roomPlayerList"),
-      mapSelectionList: document.getElementById("mapSelectionList")
+      mapSelectionList: document.getElementById("mapSelectionList"),
+      matchDurationInput: document.getElementById("matchDurationInput")
     };
 
     const saved = this.loadSession();
@@ -146,6 +167,14 @@ const Lobby = {
     this.elements.editQuestionsButton.addEventListener("click", () => window.open("questions.html", "_blank", "noopener"));
     this.elements.enterGameButton.addEventListener("click", () => this.enterGame());
     this.elements.leaveRoomButton.addEventListener("click", () => this.leaveRoom());
+    this.elements.matchDurationInput.addEventListener("change", () => this.updateMatchDuration());
+    this.elements.matchDurationInput.addEventListener("blur", () => {
+      const parsed = parseDurationInput(this.elements.matchDurationInput.value);
+      if (parsed) {
+        this.state.matchDurationMs = parsed;
+      }
+      this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
+    });
 
     if (saved?.roomId && saved?.playerId) {
       this.elements.roomCodeInput.value = saved.roomId;
@@ -234,12 +263,15 @@ const Lobby = {
     this.elements.playerRoleValue.textContent = this.getRoleLabel();
     this.elements.roomPopulationValue.textContent = `${this.state.players.length}/50`;
     this.elements.selectedMapValue.textContent = this.getSelectedMap().name;
+    this.elements.selectedTimerValue.textContent = formatDurationMs(this.state.matchDurationMs);
     this.elements.matchStateValue.textContent = this.state.matchStarted ? "Started" : "Waiting";
     this.elements.editQuestionsButton.disabled = !this.isHost();
     this.elements.enterGameButton.disabled = !this.state.connected || (!this.isHost() && !this.state.matchStarted);
     this.elements.leaveRoomButton.disabled = !this.state.connected;
     this.elements.createRoomButton.disabled = false;
     this.elements.joinRoomButton.disabled = this.state.connected;
+    this.elements.matchDurationInput.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
+    this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
     this.renderPlayers();
     this.renderMaps();
   },
@@ -247,6 +279,7 @@ const Lobby = {
     this.state.hostId = snapshot.hostId || "";
     this.state.players = Array.isArray(snapshot.players) ? snapshot.players : [];
     this.state.selectedMapId = snapshot.selectedMapId || MAPS[0].id;
+    this.state.matchDurationMs = Number(snapshot.matchDurationMs) || DEFAULT_MATCH_DURATION_MS;
     this.state.matchStarted = Boolean(snapshot.matchStarted);
   },
   async createRoom() {
@@ -280,7 +313,7 @@ const Lobby = {
     const response = await fetch(this.apiPath("/join"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomId, name, playerId })
+      body: JSON.stringify({ roomId, name, playerId, matchDurationMs: this.state.matchDurationMs })
     }).catch(() => null);
 
     if (!response) {
@@ -338,6 +371,42 @@ const Lobby = {
       this.elements.lobbyStatusValue.textContent = "Map update failed";
     });
   },
+  async updateMatchDuration() {
+    const parsed = parseDurationInput(this.elements.matchDurationInput.value);
+    if (!this.state.connected) {
+      if (!parsed) {
+        this.elements.lobbyStatusValue.textContent = "Use a timer like 3:00 or 10:00";
+        this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
+        return;
+      }
+      this.state.matchDurationMs = parsed;
+      this.updateUI();
+      return;
+    }
+    if (!this.isHost() || this.state.matchStarted) {
+      this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
+      return;
+    }
+    if (!parsed) {
+      this.elements.lobbyStatusValue.textContent = "Use a timer like 3:00 or 10:00";
+      this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
+      return;
+    }
+    this.state.matchDurationMs = parsed;
+    this.updateUI();
+    await fetch(this.apiPath("/relay"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId: this.state.roomId,
+        playerId: this.state.playerId,
+        type: "select_duration",
+        payload: { matchDurationMs: parsed }
+      })
+    }).catch(() => {
+      this.elements.lobbyStatusValue.textContent = "Timer update failed";
+    });
+  },
   async leaveRoom() {
     if (!this.state.connected) return;
     await fetch(this.apiPath("/leave"), {
@@ -353,6 +422,7 @@ const Lobby = {
       hostId: "",
       players: [],
       selectedMapId: MAPS[0].id,
+      matchDurationMs: DEFAULT_MATCH_DURATION_MS,
       matchStarted: false,
       eventSource: null,
       navigatingToGame: false
