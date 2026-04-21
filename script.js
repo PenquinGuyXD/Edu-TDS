@@ -49,10 +49,25 @@ function formatDuration(seconds) {
 function refreshQuestionBank() {
   if (typeof MultiplayerManager !== "undefined" && MultiplayerManager.state.connected) {
     questions = MultiplayerManager.getQuestionBank();
+    if (typeof QuestionManager !== "undefined" && QuestionManager.rebuildQuestionOrder) {
+      QuestionManager.rebuildQuestionOrder();
+    }
     return questions;
   }
   questions = loadQuestionBank();
+  if (typeof QuestionManager !== "undefined" && QuestionManager.rebuildQuestionOrder) {
+    QuestionManager.rebuildQuestionOrder();
+  }
   return questions;
+}
+
+function shuffleArray(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 function normalizeQuestionContext(context) {
@@ -284,7 +299,8 @@ const GameState = {
       hoverPoint: { x: 0, y: 0, inside: false },
       spectatedPlayerId: null,
       waveButtonCooldownUntil: 0,
-      multiplayerResultsRedirected: false
+      multiplayerResultsRedirected: false,
+      maxWaveReached: 0
     };
   },
   reset() {
@@ -682,6 +698,7 @@ const WaveManager = {
   startWave() {
     if (GameState.state.waveInProgress || GameState.state.isGameOver) return false;
     GameState.state.wave += 1;
+    GameState.state.maxWaveReached = Math.max(GameState.state.maxWaveReached || 0, GameState.state.wave);
     GameState.state.waveInProgress = true;
     const wave = GameState.state.wave;
     this.queue = this.buildWave(wave);
@@ -734,16 +751,31 @@ const QuestionManager = {
   intervalId: null,
   pendingCallback: null,
   openedAt: 0,
+  questionOrder: [],
+  questionIndex: 0,
   reset() {
     this.activeQuestion = null;
     this.timeRemaining = 0;
     this.pendingCallback = null;
     this.openedAt = 0;
+    this.rebuildQuestionOrder();
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
     if (typeof UIManager !== "undefined" && UIManager.hideQuestionModal) UIManager.hideQuestionModal();
+  },
+  rebuildQuestionOrder() {
+    this.questionOrder = shuffleArray(questions);
+    this.questionIndex = 0;
+  },
+  getNextQuestion() {
+    if (!this.questionOrder.length || this.questionIndex >= this.questionOrder.length) {
+      this.rebuildQuestionOrder();
+    }
+    const question = this.questionOrder[this.questionIndex] || null;
+    this.questionIndex += 1;
+    return question;
   },
   ask(context, callback) {
     // Question system: modal gates rewards, towers, and abilities. It only freezes gameplay in singleplayer.
@@ -755,7 +787,7 @@ const QuestionManager = {
     GameState.state.isQuestionOpen = true;
     GameState.state.questionGate = normalizeQuestionContext(context);
     this.pendingCallback = callback;
-    this.activeQuestion = questions[Math.floor(Math.random() * questions.length)];
+    this.activeQuestion = this.getNextQuestion();
     this.timeRemaining = 10;
     this.openedAt = performance.now();
     UIManager.showQuestionModal(this.activeQuestion, this.timeRemaining);
@@ -1537,6 +1569,9 @@ const MultiplayerManager = {
       || null;
     GameState.state.spectatedPlayerId = fallbackPlayer ? fallbackPlayer.id : null;
   },
+  getOwnPlayer() {
+    return this.state.players.find((player) => player.id === this.state.playerId) || null;
+  },
   updateOpponent() {
     this.state.opponent = this.state.players.find((player) => player.id !== this.state.playerId) || null;
   },
@@ -1579,6 +1614,14 @@ const MultiplayerManager = {
   },
   async reportQuestionStats(correct, responseMs) {
     if (!this.state.connected) return;
+    const player = this.getOwnPlayer();
+    if (player) {
+      player.stats = player.stats || { answered: 0, correct: 0, totalResponseMs: 0, bestWave: 0 };
+      player.stats.answered += 1;
+      if (correct) player.stats.correct += 1;
+      player.stats.totalResponseMs += Math.max(0, Math.round(responseMs || 0));
+      player.stats.bestWave = Math.max(player.stats.bestWave || 0, GameState.state.maxWaveReached || 0);
+    }
     await this.relay("question_stats", {
       correct: Boolean(correct),
       responseMs: Math.max(0, Math.round(responseMs || 0))
@@ -1598,12 +1641,16 @@ const MultiplayerManager = {
     if (!this.state.connected) return;
     if (!force && this.state.lastSentHp === GameState.state.hp) return;
     this.state.lastSentHp = GameState.state.hp;
+    const player = this.getOwnPlayer();
+    if (player) player.hp = GameState.state.hp;
     this.relay("health_update", { hp: GameState.state.hp });
   },
   reportGold(force = false) {
     if (!this.state.connected) return;
     if (!force && this.state.lastSentGold === GameState.state.gold) return;
     this.state.lastSentGold = GameState.state.gold;
+    const player = this.getOwnPlayer();
+    if (player) player.gold = GameState.state.gold;
     this.relay("gold_update", { gold: GameState.state.gold });
   },
   reportBoard(force = false) {
@@ -1616,6 +1663,12 @@ const MultiplayerManager = {
     this.state.lastBoardSentAt = now;
     this.state.lastSentBoard = serialized;
     this.state.boards[this.state.playerId] = board;
+    const player = this.getOwnPlayer();
+    if (player) {
+      player.board = board;
+      player.stats = player.stats || { answered: 0, correct: 0, totalResponseMs: 0, bestWave: 0 };
+      player.stats.bestWave = Math.max(player.stats.bestWave || 0, Number(board.maxWave || board.wave || 0));
+    }
     this.relay("board_update", board);
   }
 };
@@ -1723,9 +1776,11 @@ const Game = {
   restartOwnRun() {
     if (!MultiplayerManager.state.connected || !GameState.state.isGameOver) return;
     const roomMapId = MultiplayerManager.state.selectedMapId || MAPS[0].id;
+    const preservedBestWave = GameState.state.maxWaveReached || 0;
     GameState.reset();
     GameState.state.currentMapId = roomMapId;
     GameState.state.multiplayerResultsRedirected = false;
+    GameState.state.maxWaveReached = preservedBestWave;
     UIManager.renderMapSelection();
     UIManager.hideRestartModal();
     UIManager.hideGameOver();
@@ -1955,6 +2010,7 @@ const Game = {
     return {
       mapId: GameState.state.currentMapId,
       wave: GameState.state.wave,
+      maxWave: Math.max(GameState.state.maxWaveReached || 0, GameState.state.wave),
       towers: GameState.state.towers.map((tower) => ({
         type: tower.type,
         x: tower.x,

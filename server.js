@@ -102,7 +102,8 @@ function createDefaultStats() {
   return {
     answered: 0,
     correct: 0,
-    totalResponseMs: 0
+    totalResponseMs: 0,
+    bestWave: 0
   };
 }
 
@@ -321,11 +322,13 @@ function handleRelay(req, res, body) {
   if (body.type === "reset_run") {
     room.playerHealths[sender.id] = 100;
     room.playerGolds[sender.id] = 120;
-    room.playerStats[sender.id] = createDefaultStats();
     room.playerBoards[sender.id] = payload && typeof payload.board === "object" ? payload.board : null;
   }
   if (body.type === "board_update") {
     room.playerBoards[sender.id] = payload && typeof payload === "object" ? payload : null;
+    const stats = room.playerStats[sender.id] || createDefaultStats();
+    stats.bestWave = Math.max(stats.bestWave || 0, Number(payload?.maxWave || payload?.wave || 0));
+    room.playerStats[sender.id] = stats;
   }
 
   const event = {

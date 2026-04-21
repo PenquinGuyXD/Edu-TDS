@@ -50,10 +50,14 @@ function getAverageResponse(stats) {
   return Math.round(total / answered);
 }
 
+function getBestWave(player) {
+  return Number(player.stats?.bestWave || player.board?.maxWave || player.board?.wave || 0);
+}
+
 function sortPlayers(players) {
   return [...players].sort((a, b) => {
-    const aWave = Number(a.board?.wave || 0);
-    const bWave = Number(b.board?.wave || 0);
+    const aWave = getBestWave(a);
+    const bWave = getBestWave(b);
     const aAccuracy = getAccuracy(a.stats);
     const bAccuracy = getAccuracy(b.stats);
     const aResponse = getAverageResponse(a.stats);
@@ -78,14 +82,13 @@ function renderResults(players, playerId, roomId) {
   sorted.forEach((player, index) => {
     const accuracy = getAccuracy(player.stats);
     const avgResponse = getAverageResponse(player.stats);
-    const wave = Number(player.board?.wave || 0);
+    const wave = getBestWave(player);
     const card = document.createElement("article");
     card.className = `result-card${player.id === playerId ? " you" : ""}`;
     card.innerHTML = `
-      <div class="placement-badge">#${index + 1}</div>
       <div class="player-copy">
-        <h3>${player.name}${player.id === playerId ? " (You)" : ""}</h3>
-        <p>${player.side === "host" ? "Host" : "Player"} · ${player.hp ?? 0} HP · Wave ${wave} · ${player.gold ?? 0}g</p>
+        <h3><span class="inline-rank">#${index + 1}</span>${player.name}${player.id === playerId ? " (You)" : ""}</h3>
+        <p>${player.side === "host" ? "Host" : "Player"} | ${player.hp ?? 0} HP | Wave ${wave} | ${player.gold ?? 0}g</p>
       </div>
       <div class="accuracy-ring" style="--ring-angle:${accuracy * 3.6}deg">
         <span>${accuracy}%</span>
@@ -108,17 +111,19 @@ function mergePlayers(primaryPlayers, fallbackPlayers) {
   return (primaryPlayers || []).map((player) => {
     const fallback = fallbackMap.get(player.id) || {};
     const primaryAnswered = Number(player.stats?.answered || 0);
-    const fallbackAnswered = Number(fallback.stats?.answered || 0);
-    const primaryWave = Number(player.board?.wave || 0);
-    const fallbackWave = Number(fallback.board?.wave || 0);
+    const primaryBestWave = getBestWave(player);
+    const fallbackBestWave = getBestWave(fallback);
     return {
       ...fallback,
       ...player,
-      stats: primaryAnswered > 0 ? player.stats : (fallback.stats || player.stats),
-      board: primaryWave > 0 || !fallback.board ? player.board : fallback.board,
+      stats: primaryAnswered > 0 || primaryBestWave > 0 ? {
+        ...(fallback.stats || {}),
+        ...(player.stats || {}),
+        bestWave: Math.max(primaryBestWave, fallbackBestWave)
+      } : (fallback.stats || player.stats),
+      board: primaryBestWave > 0 || !fallback.board ? player.board : fallback.board,
       hp: typeof player.hp === "number" && player.hp > 0 ? player.hp : (fallback.hp ?? player.hp),
-      gold: typeof player.gold === "number" && player.gold > 0 ? player.gold : (fallback.gold ?? player.gold),
-      _fallbackAnswered: fallbackAnswered
+      gold: typeof player.gold === "number" && player.gold > 0 ? player.gold : (fallback.gold ?? player.gold)
     };
   });
 }
@@ -143,6 +148,7 @@ async function initResults() {
   const list = document.getElementById("resultsList");
   const leaveLink = document.getElementById("leaveResultsRoomLink");
   const lobbyLink = document.getElementById("returnToLobbyLink");
+
   leaveLink?.addEventListener("click", async (event) => {
     event.preventDefault();
     await leaveRoomAndExit("lobby.html");
@@ -151,6 +157,7 @@ async function initResults() {
     event.preventDefault();
     await leaveRoomAndExit("lobby.html");
   });
+
   if (!session?.roomId || !session?.name) {
     if (cached?.players?.length) {
       renderResults(cached.players, cached.playerId, cached.roomId);
