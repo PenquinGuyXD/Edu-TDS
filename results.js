@@ -47,7 +47,7 @@ function getAverageResponse(stats) {
   const answered = Number(stats?.answered || 0);
   const total = Number(stats?.totalResponseMs || 0);
   if (answered <= 0) return 0;
-  return Math.round(total / answered);
+  return total / answered / 1000;
 }
 
 function getBestWave(player) {
@@ -94,7 +94,7 @@ function renderResults(players, playerId, roomId) {
         <span>${accuracy}%</span>
       </div>
       <div class="result-metric">
-        <strong>${avgResponse} ms</strong>
+        <strong>${avgResponse.toFixed(2)}s</strong>
         <span>Avg Response</span>
       </div>
       <div class="result-metric">
