@@ -144,6 +144,7 @@ function getGameLaunchPath(gameId) {
 
 const Lobby = {
   state: {
+    currentView: "offline",
     connected: false,
     roomId: "",
     playerId: "",
@@ -162,10 +163,18 @@ const Lobby = {
   init() {
     this.elements = {
       playerNameInput: document.getElementById("playerNameInput"),
-      roomCodeInput: document.getElementById("roomCodeInput"),
+      joinRoomCodeInput: document.getElementById("joinRoomCodeInput"),
+      joinRoomCodeGroup: document.getElementById("joinRoomCodeGroup"),
+      createdRoomCodeGroup: document.getElementById("createdRoomCodeGroup"),
+      createdRoomCodeValue: document.getElementById("createdRoomCodeValue"),
+      offlineViewButton: document.getElementById("offlineViewButton"),
+      onlineViewButton: document.getElementById("onlineViewButton"),
+      offlineLobbyView: document.getElementById("offlineLobbyView"),
+      onlineLobbyView: document.getElementById("onlineLobbyView"),
       createRoomButton: document.getElementById("createRoomButton"),
       joinRoomButton: document.getElementById("joinRoomButton"),
       startOfflineButton: document.getElementById("startOfflineButton"),
+      offlineEditQuestionsButton: document.getElementById("offlineEditQuestionsButton"),
       editQuestionsButton: document.getElementById("editQuestionsButton"),
       enterGameButton: document.getElementById("enterGameButton"),
       leaveRoomButton: document.getElementById("leaveRoomButton"),
@@ -187,14 +196,17 @@ const Lobby = {
 
     const saved = this.loadSession();
     this.elements.playerNameInput.value = saved?.name || `Player-${Math.random().toString(36).slice(2, 5)}`;
-    this.elements.roomCodeInput.value = `room-${Math.random().toString(36).slice(2, 6)}`;
+    this.elements.joinRoomCodeInput.value = "";
 
     this.renderGames();
     this.renderMaps();
 
     this.elements.createRoomButton.addEventListener("click", () => this.createRoom());
     this.elements.joinRoomButton.addEventListener("click", () => this.joinRoom());
+    this.elements.offlineViewButton.addEventListener("click", () => this.setView("offline"));
+    this.elements.onlineViewButton.addEventListener("click", () => this.setView("online"));
     this.elements.startOfflineButton.addEventListener("click", () => this.startOfflineGame());
+    this.elements.offlineEditQuestionsButton.addEventListener("click", () => window.location.href = "questions.html");
     this.elements.editQuestionsButton.addEventListener("click", () => window.open("questions.html", "_blank", "noopener"));
     this.elements.enterGameButton.addEventListener("click", () => this.enterGame());
     this.elements.leaveRoomButton.addEventListener("click", () => this.leaveRoom());
@@ -212,7 +224,7 @@ const Lobby = {
     });
 
     if (saved?.roomId && saved?.playerId) {
-      this.elements.roomCodeInput.value = saved.roomId;
+      this.elements.createdRoomCodeValue.textContent = saved.roomId;
       this.joinRoom(saved);
     } else {
       this.updateUI();
@@ -283,10 +295,6 @@ const Lobby = {
       return;
     }
     if (this.state.selectedGameId !== "tower-defense") {
-      const notice = document.createElement("div");
-      notice.className = "room-player-empty";
-      notice.textContent = "Map selection is only used for Tower Defense.";
-      list.appendChild(notice);
       return;
     }
     MAPS.forEach((map) => {
@@ -333,6 +341,13 @@ const Lobby = {
     });
   },
   updateUI() {
+    this.elements.offlineLobbyView.classList.toggle("active", this.state.currentView === "offline");
+    this.elements.onlineLobbyView.classList.toggle("active", this.state.currentView === "online");
+    this.elements.offlineViewButton.classList.toggle("selected", this.state.currentView === "offline");
+    this.elements.onlineViewButton.classList.toggle("selected", this.state.currentView === "online");
+    this.elements.joinRoomCodeGroup.classList.toggle("hidden", this.state.connected);
+    this.elements.createdRoomCodeGroup.classList.toggle("hidden", !this.state.connected);
+    this.elements.createdRoomCodeValue.textContent = this.state.roomId || "room-0000";
     this.elements.lobbyStatusValue.textContent = this.state.connected ? "Connected" : "Offline";
     this.elements.currentRoomValue.textContent = this.state.roomId || "None";
     this.elements.playerRoleValue.textContent = this.getRoleLabel();
@@ -344,10 +359,12 @@ const Lobby = {
     this.elements.selectedTimerValue.textContent = formatDurationMs(this.state.matchDurationMs);
     this.elements.matchStateValue.textContent = this.state.matchStarted ? "Started" : "Waiting";
     this.elements.editQuestionsButton.disabled = !this.isHost();
+    this.elements.offlineEditQuestionsButton.disabled = false;
     this.elements.enterGameButton.disabled = !this.state.connected || (!this.isHost() && !this.state.matchStarted);
     this.elements.leaveRoomButton.disabled = !this.state.connected;
     this.elements.createRoomButton.disabled = false;
     this.elements.joinRoomButton.disabled = this.state.connected;
+    this.elements.startOfflineButton.disabled = this.state.connected || !this.state.selectedGameId;
     this.elements.matchDurationInput.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
     this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
     this.elements.rrDifficultySelect.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
@@ -359,6 +376,10 @@ const Lobby = {
     this.renderGames();
     this.renderPlayers();
     this.renderMaps();
+  },
+  setView(view) {
+    this.state.currentView = view === "online" ? "online" : "offline";
+    this.updateUI();
   },
   applySnapshot(snapshot) {
     this.state.hostId = snapshot.hostId || "";
@@ -385,12 +406,12 @@ const Lobby = {
     }
 
     this.state.navigatingToGame = false;
-    this.elements.roomCodeInput.value = roomId;
+    this.elements.createdRoomCodeValue.textContent = roomId;
     await this.joinRoom({ roomId, name, playerId: "" });
   },
   async joinRoom(override = null) {
     const saved = override || {};
-    const roomId = String(saved.roomId || this.elements.roomCodeInput.value).trim().toLowerCase();
+    const roomId = String(saved.roomId || this.elements.joinRoomCodeInput.value).trim().toLowerCase();
     const name = String(saved.name || this.elements.playerNameInput.value).trim() || "Player";
     const playerId = String(saved.playerId || "").trim();
     if (!roomId) {
@@ -634,13 +655,17 @@ const Lobby = {
     this.updateUI();
   },
   async startOfflineGame() {
+    if (!this.state.selectedGameId) {
+      this.elements.lobbyStatusValue.textContent = "Choose a game first";
+      return;
+    }
     if (this.state.connected) {
       await this.leaveRoom();
     } else {
       this.clearSession();
     }
     this.state.navigatingToGame = true;
-    window.location.href = getGameLaunchPath(this.state.selectedGameId || "tower-defense");
+    window.location.href = getGameLaunchPath(this.state.selectedGameId);
   },
   async enterGame(fromAuto = false) {
     if (!this.state.connected) return;

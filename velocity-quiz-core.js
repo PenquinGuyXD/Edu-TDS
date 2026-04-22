@@ -254,7 +254,9 @@ const RRMultiplayer = {
       this.applySnapshot(message);
       game.applyQuestionBank();
       game.updateHud();
-      if (!wasStarted && this.state.matchStarted && this.state.selectedGameId === "reflect-rumble") {
+      if (
+        (!wasStarted && this.state.matchStarted || game.phase === "menu")
+      ) {
         game.startGame(true);
       }
       return;
@@ -351,6 +353,7 @@ class ReflectRumbleGame {
       timerDisplay: document.getElementById("timer-display"),
       pointsDisplay: document.getElementById("points-display"),
       opponentPointsDisplay: document.getElementById("opponent-points-display"),
+      powerupHudCard: document.getElementById("powerup-hud-card"),
       powerupState: document.getElementById("powerup-state"),
       arenaGrid: document.getElementById("arena-grid"),
       feedback: document.getElementById("feedback"),
@@ -371,18 +374,12 @@ class ReflectRumbleGame {
     this.applyRoomSettings();
     this.applyQuestionBank();
     this.showScreen("game");
-    if (RRMultiplayer.state.connected && RRMultiplayer.state.selectedGameId === "reflect-rumble") {
+    if (RRMultiplayer.state.connected) {
       this.elements.multiplayerBanner.classList.remove("hidden");
       this.elements.offlineStartButton?.classList.add("hidden");
       this.elements.returnLobbyInlineBtn?.classList.add("hidden");
-      this.elements.multiplayerBanner.textContent = RRMultiplayer.state.matchStarted
-        ? `Room ${RRMultiplayer.state.roomId.toUpperCase()} live`
-        : `Waiting for the host to start room ${RRMultiplayer.state.roomId.toUpperCase()}`;
-      if (RRMultiplayer.state.matchStarted) {
-        this.startGame(true);
-      } else {
-        this.setFeedback("Waiting for the host to start the match.", "info");
-      }
+      this.elements.multiplayerBanner.textContent = `Room ${RRMultiplayer.state.roomId.toUpperCase()} live`;
+      this.startGame(true);
     } else {
       this.elements.multiplayerBanner.classList.add("hidden");
       this.powerUpsEnabled = false;
@@ -397,8 +394,8 @@ class ReflectRumbleGame {
     this.elements.offlineStartButton?.addEventListener("click", () => this.startGame(false));
     this.elements.restartBtn.addEventListener("click", () => this.startGame(false));
     this.elements.menuBtn.addEventListener("click", () => this.returnToLobby());
-    this.elements.returnLobbyInlineBtn.addEventListener("click", () => this.returnToLobby());
-    this.elements.exitBtn.addEventListener("click", () => {
+    this.elements.returnLobbyInlineBtn?.addEventListener("click", () => this.returnToLobby());
+    this.elements.exitBtn?.addEventListener("click", () => {
       this.elements.exitBtn.textContent = "Close the browser tab to exit";
       window.setTimeout(() => { this.elements.exitBtn.textContent = "Exit"; }, 1800);
     });
@@ -431,7 +428,7 @@ class ReflectRumbleGame {
   }
 
   startGame(forceMultiplayerStart) {
-    if (RRMultiplayer.state.connected && !RRMultiplayer.state.matchStarted && !forceMultiplayerStart) return;
+    if (RRMultiplayer.state.connected && !forceMultiplayerStart) return;
     this.clearTimers();
     this.resultsRedirected = false;
     this.showScreen("game");
@@ -852,6 +849,7 @@ class ReflectRumbleGame {
   }
 
   updateHud() {
+    this.elements.powerupHudCard?.classList.toggle("hidden", !RRMultiplayer.state.connected);
     this.elements.difficultyDisplay.textContent = this.difficulty.label;
     this.elements.roundDisplay.textContent = String(this.round || 1);
     this.elements.timerDisplay.textContent = RRMultiplayer.state.connected
@@ -863,6 +861,7 @@ class ReflectRumbleGame {
   }
 
   setFeedback(message, tone) {
+    this.elements.feedback.classList.remove("hidden");
     this.elements.feedback.textContent = message;
     this.elements.feedback.className = `feedback ${tone || ""}`.trim();
   }

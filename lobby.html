@@ -14,49 +14,74 @@
       <p class="hero-copy">Create or join a room here, watch the roster fill up, then move into the match when everyone is ready.</p>
     </section>
 
-    <section class="lobby-grid">
-      <section class="lobby-card">
-        <h2>Join A Room</h2>
-        <div class="form-grid">
-          <label>
-            <span>Your Name</span>
-            <input id="playerNameInput" type="text" maxlength="24" placeholder="Player name">
-          </label>
-          <label>
-            <span>Room Code</span>
-            <input id="roomCodeInput" type="text" maxlength="16" placeholder="room-1234">
-          </label>
-        </div>
-        <div class="button-row">
-          <button id="createRoomButton" class="primary-button">Create Room</button>
-          <button id="joinRoomButton" class="secondary-button">Join Room</button>
-        </div>
-        <div class="button-row">
-          <button id="startOfflineButton" class="secondary-button">Start Offline Game</button>
-          <button id="editQuestionsButton" class="secondary-button" disabled>Edit Questions</button>
-          <button id="enterGameButton" class="primary-button" disabled>Enter Match</button>
-        </div>
-        <div class="button-row single-row">
-          <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
-        </div>
-        <div class="status-grid">
-          <div><span>Status</span><strong id="lobbyStatusValue">Offline</strong></div>
-          <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
-          <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
-          <div><span>Players</span><strong id="roomPopulationValue">0/50</strong></div>
-          <div><span>Game</span><strong id="selectedGameValue">None</strong></div>
-          <div><span>Map</span><strong id="selectedMapValue">Meadow Pass</strong></div>
-          <div><span>Timer</span><strong id="selectedTimerValue">5:00</strong></div>
-          <div><span>Match</span><strong id="matchStateValue">Waiting</strong></div>
-        </div>
-      </section>
+    <section class="lobby-card">
+      <h2>Play Mode</h2>
+      <p class="section-copy">Switch between offline game setup and online room play.</p>
+      <div id="playModeToggle" class="play-mode-toggle">
+        <button id="offlineViewButton" type="button" class="mode-toggle-button selected">Offline Games</button>
+        <button id="onlineViewButton" type="button" class="mode-toggle-button">Online Games</button>
+      </div>
+    </section>
 
+    <section id="onlineLobbyView" class="lobby-view active">
+      <section class="lobby-grid">
+        <section class="lobby-card">
+          <h2>Join A Room</h2>
+          <div class="form-grid">
+            <label>
+              <span>Your Name</span>
+              <input id="playerNameInput" type="text" maxlength="24" placeholder="Player name">
+            </label>
+            <label id="joinRoomCodeGroup" class="hidden">
+              <span>Join Room Code</span>
+              <input id="joinRoomCodeInput" type="text" maxlength="16" placeholder="room-1234">
+            </label>
+            <div id="createdRoomCodeGroup" class="room-code-display hidden">
+              <span>Your Room Code</span>
+              <strong id="createdRoomCodeValue">room-0000</strong>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="createRoomButton" class="primary-button">Create Room</button>
+            <button id="joinRoomButton" class="secondary-button">Join Room</button>
+          </div>
+          <div class="button-row">
+            <button id="editQuestionsButton" class="secondary-button" disabled>Edit Questions</button>
+            <button id="enterGameButton" class="primary-button" disabled>Enter Match</button>
+          </div>
+          <div class="button-row single-row">
+            <button id="leaveRoomButton" class="danger-button" disabled>Leave Room</button>
+          </div>
+          <div class="status-grid">
+            <div><span>Status</span><strong id="lobbyStatusValue">Offline</strong></div>
+            <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
+            <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
+            <div><span>Players</span><strong id="roomPopulationValue">0/50</strong></div>
+            <div><span>Game</span><strong id="selectedGameValue">None</strong></div>
+            <div><span>Map</span><strong id="selectedMapValue">Meadow Pass</strong></div>
+            <div><span>Timer</span><strong id="selectedTimerValue">5:00</strong></div>
+            <div><span>Match</span><strong id="matchStateValue">Waiting</strong></div>
+          </div>
+        </section>
+
+        <section class="lobby-card">
+          <h2>Waiting Room</h2>
+          <p class="section-copy">The first player listed is the host. Everyone in the match will use the host's custom question bank.</p>
+          <ul id="roomPlayerList" class="room-player-list">
+            <li class="room-player-empty">No one is in a room yet.</li>
+          </ul>
+        </section>
+      </section>
+    </section>
+
+    <section id="offlineLobbyView" class="lobby-view">
       <section class="lobby-card">
-        <h2>Waiting Room</h2>
-        <p class="section-copy">The first player listed is the host. Everyone in the match will use the host's custom question bank.</p>
-        <ul id="roomPlayerList" class="room-player-list">
-          <li class="room-player-empty">No one is in a room yet.</li>
-        </ul>
+        <h2>Offline Games</h2>
+        <p class="section-copy">Choose a game mode, adjust its settings, then launch a solo run.</p>
+        <div class="button-row offline-button-row">
+          <button id="startOfflineButton" class="secondary-button">Start Offline Game</button>
+          <button id="offlineEditQuestionsButton" class="secondary-button">Edit Questions</button>
+        </div>
       </section>
     </section>
 
