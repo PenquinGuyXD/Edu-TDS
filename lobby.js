@@ -142,6 +142,10 @@ function getGameLaunchPath(gameId) {
   return gameId === "reflect-rumble" ? "brainrush-arcade-launcher.html" : "index.html";
 }
 
+function createFreshRoomCode() {
+  return `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 const Lobby = {
   state: {
     currentView: "offline",
@@ -397,7 +401,7 @@ const Lobby = {
   },
   async createRoom() {
     const name = String(this.elements.playerNameInput.value).trim() || "Player";
-    const roomId = `room-${Math.random().toString(36).slice(2, 6)}`;
+    const roomId = createFreshRoomCode();
 
     if (this.state.connected) {
       await this.leaveRoom();
@@ -405,7 +409,10 @@ const Lobby = {
       this.clearSession();
     }
 
+    this.setView("online");
     this.state.navigatingToGame = false;
+    this.elements.joinRoomCodeInput.value = "";
+    this.elements.lobbyStatusValue.textContent = "Creating room";
     this.elements.createdRoomCodeValue.textContent = roomId;
     await this.joinRoom({ roomId, name, playerId: "" });
   },
