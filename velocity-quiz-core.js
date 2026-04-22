@@ -373,17 +373,21 @@ class ReflectRumbleGame {
     this.showScreen("game");
     if (RRMultiplayer.state.connected && RRMultiplayer.state.selectedGameId === "reflect-rumble") {
       this.elements.multiplayerBanner.classList.remove("hidden");
+      this.elements.offlineStartButton?.classList.add("hidden");
+      this.elements.returnLobbyInlineBtn?.classList.add("hidden");
       this.elements.multiplayerBanner.textContent = RRMultiplayer.state.matchStarted
         ? `Room ${RRMultiplayer.state.roomId.toUpperCase()} live`
         : `Waiting for the host to start room ${RRMultiplayer.state.roomId.toUpperCase()}`;
-      this.elements.offlineStartButton?.classList.add("hidden");
       if (RRMultiplayer.state.matchStarted) {
         this.startGame(true);
+      } else {
+        this.setFeedback("Waiting for the host to start the match.", "info");
       }
     } else {
       this.elements.multiplayerBanner.classList.add("hidden");
       this.powerUpsEnabled = false;
       this.elements.offlineStartButton?.classList.remove("hidden");
+      this.elements.returnLobbyInlineBtn?.classList.remove("hidden");
       this.setFeedback("Press Start Match to begin.", "info");
     }
     this.updateHud();
@@ -431,7 +435,13 @@ class ReflectRumbleGame {
     this.clearTimers();
     this.resultsRedirected = false;
     this.showScreen("game");
-    this.elements.offlineStartButton?.classList.add("hidden");
+    if (RRMultiplayer.state.connected) {
+      this.elements.offlineStartButton?.classList.add("hidden");
+      this.elements.returnLobbyInlineBtn?.classList.add("hidden");
+    } else {
+      this.elements.offlineStartButton?.classList.add("hidden");
+      this.elements.returnLobbyInlineBtn?.classList.remove("hidden");
+    }
     if (!RRMultiplayer.state.connected) {
       this.phase = "game";
       this.powerUpsEnabled = false;
@@ -452,7 +462,7 @@ class ReflectRumbleGame {
     this.player.roundsCorrect = 0;
     this.round = 0;
     if (RRMultiplayer.state.connected) {
-      this.startCountdown(10);
+      this.startCountdown(5);
     } else {
       this.startNextRound();
       this.startLoop();
