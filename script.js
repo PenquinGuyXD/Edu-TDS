@@ -1,6 +1,7 @@
 const CUSTOM_QUESTIONS_KEY = "scholar-siege-custom-questions";
 const MULTIPLAYER_SESSION_KEY = "scholar-siege-room-session";
 const MULTIPLAYER_RESULTS_KEY = "scholar-siege-results-snapshot";
+let skipMultiplayerLeaveOnUnload = false;
 
 function getCustomQuestions() {
   try {
@@ -43,7 +44,7 @@ function formatDuration(seconds) {
   const whole = Math.max(0, Math.ceil(seconds));
   const minutes = Math.floor(whole / 60);
   const remaining = whole % 60;
-  return `${minutes}:${String(remaining).padStart(2, "0")}`;
+  return `${String(minutes)}:${String(remaining).padStart(2, "0")}`;
 }
 
 function refreshQuestionBank() {
@@ -1353,24 +1354,34 @@ const MultiplayerManager = {
   maybeRedirectToResults() {
     if (!this.state.connected || !this.state.matchStartAt || this.state.resultsRedirected || GameState.state.multiplayerResultsRedirected) return;
     if (Date.now() < this.state.matchStartAt + this.state.matchDurationMs) return;
-    const players = this.state.players.map((player) => ({
-      ...player,
-      board: this.state.boards[player.id] || player.board || null,
-      stats: player.id === this.state.playerId
-        ? {
-            answered: Number(this.state.localPlayerStats.answered || player.stats?.answered || 0),
-            correct: Number(this.state.localPlayerStats.correct || player.stats?.correct || 0),
-            totalResponseMs: Number(this.state.localPlayerStats.totalResponseMs || player.stats?.totalResponseMs || 0),
-            bestWave: Math.max(
-              Number(this.state.localPlayerStats.bestWave || 0),
-              Number(player.stats?.bestWave || 0),
-              Number(this.state.boards[player.id]?.maxWave || 0),
-              Number(player.board?.maxWave || 0),
-              Number(player.board?.wave || 0)
-            )
-          }
-        : player.stats
-    }));
+    const ownBoard = this.state.boards[this.state.playerId] || Game.buildBoardSnapshot();
+    const ownPlayer = this.getOwnPlayer();
+    const ownEntry = {
+      id: this.state.playerId,
+      name: ownPlayer?.name || loadMultiplayerSession()?.name || "Player",
+      side: this.isHost() ? "host" : "player",
+      hp: GameState.state.hp,
+      gold: GameState.state.gold,
+      board: ownBoard,
+      stats: {
+        answered: Number(this.state.localPlayerStats.answered || 0),
+        correct: Number(this.state.localPlayerStats.correct || 0),
+        totalResponseMs: Number(this.state.localPlayerStats.totalResponseMs || 0),
+        bestWave: Math.max(
+          Number(this.state.localPlayerStats.bestWave || 0),
+          Number(ownBoard?.maxWave || 0),
+          Number(ownBoard?.wave || 0),
+          Number(GameState.state.maxWaveReached || 0)
+        )
+      }
+    };
+    const players = this.state.players
+      .filter((player) => player.id !== this.state.playerId)
+      .map((player) => ({
+        ...player,
+        board: this.state.boards[player.id] || player.board || null
+      }));
+    players.unshift(ownEntry);
     sessionStorage.setItem(MULTIPLAYER_RESULTS_KEY, JSON.stringify({
       roomId: this.state.roomId,
       playerId: this.state.playerId,
@@ -1378,6 +1389,7 @@ const MultiplayerManager = {
     }));
     this.state.resultsRedirected = true;
     GameState.state.multiplayerResultsRedirected = true;
+    skipMultiplayerLeaveOnUnload = true;
     window.location.href = "results.html";
   },
   getQuestionBank() {
@@ -2559,7 +2571,7 @@ window.addEventListener("load", () => {
 });
 
 window.addEventListener("beforeunload", () => {
-  if (MultiplayerManager.state.connected) {
+  if (MultiplayerManager.state.connected && !skipMultiplayerLeaveOnUnload) {
     navigator.sendBeacon(
       MultiplayerManager.apiPath("/leave"),
       JSON.stringify({ roomId: MultiplayerManager.state.roomId, playerId: MultiplayerManager.state.playerId })
