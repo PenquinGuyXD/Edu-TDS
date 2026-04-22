@@ -126,7 +126,7 @@ function normalizeRoom(room) {
       room.playerHealths[player.id] = 100;
     }
     if (typeof room.playerGolds[player.id] !== "number") {
-      room.playerGolds[player.id] = 120;
+      room.playerGolds[player.id] = 70;
     }
     if (!room.playerStats[player.id] || typeof room.playerStats[player.id] !== "object") {
       room.playerStats[player.id] = createDefaultStats();
@@ -220,7 +220,7 @@ function handleJoin(req, res, body) {
 
   room.players.push(player);
   room.playerHealths[player.id] = 100;
-  room.playerGolds[player.id] = 120;
+  room.playerGolds[player.id] = 70;
   room.playerStats[player.id] = createDefaultStats();
   if (room.players.length === 1) {
     room.hostId = player.id;
@@ -321,7 +321,7 @@ function handleRelay(req, res, body) {
   }
   if (body.type === "reset_run") {
     room.playerHealths[sender.id] = 100;
-    room.playerGolds[sender.id] = 120;
+    room.playerGolds[sender.id] = 70;
     room.playerBoards[sender.id] = payload && typeof payload.board === "object" ? payload.board : null;
   }
   if (body.type === "board_update") {

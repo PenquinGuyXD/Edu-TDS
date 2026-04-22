@@ -270,7 +270,7 @@ const GameState = {
   width: 960,
   height: 540,
   baseHp: 100,
-  startingGold: 120,
+  startingGold: 70,
   state: null,
   createInitialState() {
     return {
@@ -824,12 +824,10 @@ const QuestionManager = {
       GameState.state.particles.push(new FloatingText(`+${reward}g`, 40, 40, "#ffcf5d"));
       }
     } else {
-      penalty = 6;
-      GameState.state.gold = Math.max(0, GameState.state.gold - penalty);
-      GameState.state.particles.push(new FloatingText(`-${penalty}g`, 40, 40, "#ff8a8a"));
+      penalty = 0;
     }
 
-    UIManager.setQuestionFeedback(correct ? (reward > 0 ? `${label} +${reward} gold.` : label) : `${label} -${penalty} gold.`);
+    UIManager.setQuestionFeedback(correct ? (reward > 0 ? `${label} +${reward} gold.` : label) : label);
 
     setTimeout(() => {
       if (this.intervalId) {
@@ -1315,7 +1313,8 @@ const MultiplayerManager = {
     lastSentBoard: null,
     lastBoardSentAt: 0,
     lastQuestionsHash: "",
-    resultsRedirected: false
+    resultsRedirected: false,
+    localPlayerStats: { answered: 0, correct: 0, totalResponseMs: 0, bestWave: 0 }
   },
   init() {
     const session = loadMultiplayerSession();
@@ -1356,7 +1355,21 @@ const MultiplayerManager = {
     if (Date.now() < this.state.matchStartAt + this.state.matchDurationMs) return;
     const players = this.state.players.map((player) => ({
       ...player,
-      board: this.state.boards[player.id] || player.board || null
+      board: this.state.boards[player.id] || player.board || null,
+      stats: player.id === this.state.playerId
+        ? {
+            answered: Number(this.state.localPlayerStats.answered || player.stats?.answered || 0),
+            correct: Number(this.state.localPlayerStats.correct || player.stats?.correct || 0),
+            totalResponseMs: Number(this.state.localPlayerStats.totalResponseMs || player.stats?.totalResponseMs || 0),
+            bestWave: Math.max(
+              Number(this.state.localPlayerStats.bestWave || 0),
+              Number(player.stats?.bestWave || 0),
+              Number(this.state.boards[player.id]?.maxWave || 0),
+              Number(player.board?.maxWave || 0),
+              Number(player.board?.wave || 0)
+            )
+          }
+        : player.stats
     }));
     sessionStorage.setItem(MULTIPLAYER_RESULTS_KEY, JSON.stringify({
       roomId: this.state.roomId,
@@ -1414,6 +1427,15 @@ const MultiplayerManager = {
       GameState.state.isPaused = false;
       this.state.boards = Object.fromEntries((Array.isArray(payload.players) ? payload.players : []).map((player) => [player.id, player.board || null]));
       this.state.side = this.isHost() ? "host" : "player";
+      {
+        const self = this.state.players.find((player) => player.id === payload.playerId);
+        this.state.localPlayerStats = {
+          answered: Number(self?.stats?.answered || 0),
+          correct: Number(self?.stats?.correct || 0),
+          totalResponseMs: Number(self?.stats?.totalResponseMs || 0),
+          bestWave: Number(self?.stats?.bestWave || 0)
+        };
+      }
       this.updateOpponent();
       this.openEventStream();
       saveMultiplayerSession({ roomId: payload.roomId, name, playerId: payload.playerId });
@@ -1471,7 +1493,8 @@ const MultiplayerManager = {
       lastSentBoard: null,
       lastBoardSentAt: 0,
       lastQuestionsHash: "",
-      resultsRedirected: false
+      resultsRedirected: false,
+      localPlayerStats: { answered: 0, correct: 0, totalResponseMs: 0, bestWave: 0 }
     };
   },
   openEventStream() {
@@ -1494,6 +1517,15 @@ const MultiplayerManager = {
     this.state.matchStarted = Boolean(snapshot.matchStarted);
     this.state.matchStartAt = snapshot.matchStartAt || this.state.matchStartAt;
     this.state.matchDurationMs = snapshot.matchDurationMs || this.state.matchDurationMs;
+    const self = this.state.players.find((player) => player.id === this.state.playerId);
+    if (self) {
+      self.stats = {
+        answered: Math.max(Number(self.stats?.answered || 0), Number(this.state.localPlayerStats.answered || 0)),
+        correct: Math.max(Number(self.stats?.correct || 0), Number(this.state.localPlayerStats.correct || 0)),
+        totalResponseMs: Math.max(Number(self.stats?.totalResponseMs || 0), Number(this.state.localPlayerStats.totalResponseMs || 0)),
+        bestWave: Math.max(Number(self.stats?.bestWave || 0), Number(this.state.localPlayerStats.bestWave || 0))
+      };
+    }
     this.state.side = this.isHost() ? "host" : "player";
     this.updateOpponent();
     this.ensureSpectatorTarget();
@@ -1614,6 +1646,10 @@ const MultiplayerManager = {
   },
   async reportQuestionStats(correct, responseMs) {
     if (!this.state.connected) return;
+    this.state.localPlayerStats.answered += 1;
+    if (correct) this.state.localPlayerStats.correct += 1;
+    this.state.localPlayerStats.totalResponseMs += Math.max(0, Math.round(responseMs || 0));
+    this.state.localPlayerStats.bestWave = Math.max(this.state.localPlayerStats.bestWave || 0, GameState.state.maxWaveReached || 0);
     const player = this.getOwnPlayer();
     if (player) {
       player.stats = player.stats || { answered: 0, correct: 0, totalResponseMs: 0, bestWave: 0 };
@@ -1669,6 +1705,7 @@ const MultiplayerManager = {
       player.stats = player.stats || { answered: 0, correct: 0, totalResponseMs: 0, bestWave: 0 };
       player.stats.bestWave = Math.max(player.stats.bestWave || 0, Number(board.maxWave || board.wave || 0));
     }
+    this.state.localPlayerStats.bestWave = Math.max(this.state.localPlayerStats.bestWave || 0, Number(board.maxWave || board.wave || 0));
     this.relay("board_update", board);
   }
 };
