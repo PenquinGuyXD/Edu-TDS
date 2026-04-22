@@ -1,5 +1,19 @@
 const MULTIPLAYER_SESSION_KEY = "scholar-siege-room-session";
 const DEFAULT_MATCH_DURATION_MS = 5 * 60 * 1000;
+const DEFAULT_RR_MATCH_DURATION_MS = 2 * 60 * 1000;
+const DEFAULT_RR_DIFFICULTY = "medium";
+const GAMES = [
+  {
+    id: "tower-defense",
+    name: "Tower Defense",
+    description: "Defend the path, build towers, answer questions, and outlast the room."
+  },
+  {
+    id: "reflect-rumble",
+    name: "Reflect Rumble",
+    description: "Fast arcade FPS action powered by the files in the fps folder."
+  }
+];
 
 const MAPS = [
   {
@@ -120,6 +134,14 @@ function parseDurationInput(value) {
   return totalSeconds * 1000;
 }
 
+function getDefaultDurationForGame(gameId) {
+  return gameId === "reflect-rumble" ? DEFAULT_RR_MATCH_DURATION_MS : DEFAULT_MATCH_DURATION_MS;
+}
+
+function getGameLaunchPath(gameId) {
+  return gameId === "reflect-rumble" ? "fps/brainrush-arcade-launcher.html" : "index.html";
+}
+
 const Lobby = {
   state: {
     connected: false,
@@ -127,8 +149,11 @@ const Lobby = {
     playerId: "",
     hostId: "",
     players: [],
+    selectedGameId: "",
     selectedMapId: MAPS[0].id,
     matchDurationMs: DEFAULT_MATCH_DURATION_MS,
+    rrDifficulty: DEFAULT_RR_DIFFICULTY,
+    rrPowerupsEnabled: true,
     matchStarted: false,
     eventSource: null,
     navigatingToGame: false
@@ -148,18 +173,23 @@ const Lobby = {
       currentRoomValue: document.getElementById("currentRoomValue"),
       playerRoleValue: document.getElementById("playerRoleValue"),
       roomPopulationValue: document.getElementById("roomPopulationValue"),
+      selectedGameValue: document.getElementById("selectedGameValue"),
       selectedMapValue: document.getElementById("selectedMapValue"),
       selectedTimerValue: document.getElementById("selectedTimerValue"),
       matchStateValue: document.getElementById("matchStateValue"),
       roomPlayerList: document.getElementById("roomPlayerList"),
+      gameSelectionList: document.getElementById("gameSelectionList"),
       mapSelectionList: document.getElementById("mapSelectionList"),
-      matchDurationInput: document.getElementById("matchDurationInput")
+      matchDurationInput: document.getElementById("matchDurationInput"),
+      rrDifficultySelect: document.getElementById("rrDifficultySelect"),
+      rrPowerupsEnabled: document.getElementById("rrPowerupsEnabled")
     };
 
     const saved = this.loadSession();
     this.elements.playerNameInput.value = saved?.name || `Player-${Math.random().toString(36).slice(2, 5)}`;
     this.elements.roomCodeInput.value = `room-${Math.random().toString(36).slice(2, 6)}`;
 
+    this.renderGames();
     this.renderMaps();
 
     this.elements.createRoomButton.addEventListener("click", () => this.createRoom());
@@ -169,6 +199,8 @@ const Lobby = {
     this.elements.enterGameButton.addEventListener("click", () => this.enterGame());
     this.elements.leaveRoomButton.addEventListener("click", () => this.leaveRoom());
     this.elements.matchDurationInput.addEventListener("change", () => this.updateMatchDuration());
+    this.elements.rrDifficultySelect.addEventListener("change", () => this.updateRRDifficulty());
+    this.elements.rrPowerupsEnabled.addEventListener("change", () => this.updateRRPowerups());
     this.elements.playerNameInput.addEventListener("change", () => this.updatePlayerName());
     this.elements.playerNameInput.addEventListener("blur", () => this.updatePlayerName());
     this.elements.matchDurationInput.addEventListener("blur", () => {
@@ -214,9 +246,49 @@ const Lobby = {
   getSelectedMap() {
     return MAPS.find((map) => map.id === this.state.selectedMapId) || MAPS[0];
   },
+  getSelectedGame() {
+    return GAMES.find((game) => game.id === this.state.selectedGameId) || null;
+  },
+  renderGames() {
+    const list = this.elements.gameSelectionList;
+    list.innerHTML = "";
+    if (this.state.connected && !this.isHost()) {
+      const notice = document.createElement("div");
+      notice.className = "room-player-empty";
+      notice.textContent = "Only the host can choose the game for this room.";
+      list.appendChild(notice);
+      return;
+    }
+    GAMES.forEach((game) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `game-card${this.state.selectedGameId === game.id ? " selected" : ""}`;
+      button.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
+      button.innerHTML = `
+        <h3>${game.name}</h3>
+        <p>${game.description}</p>
+      `;
+      button.addEventListener("click", () => this.selectGame(game.id));
+      list.appendChild(button);
+    });
+  },
   renderMaps() {
     const list = this.elements.mapSelectionList;
     list.innerHTML = "";
+    if (!this.state.selectedGameId) {
+      const notice = document.createElement("div");
+      notice.className = "room-player-empty";
+      notice.textContent = "Choose a game first to unlock map selection.";
+      list.appendChild(notice);
+      return;
+    }
+    if (this.state.selectedGameId !== "tower-defense") {
+      const notice = document.createElement("div");
+      notice.className = "room-player-empty";
+      notice.textContent = "Map selection is only used for Tower Defense.";
+      list.appendChild(notice);
+      return;
+    }
     MAPS.forEach((map) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -230,7 +302,7 @@ const Lobby = {
           <img class="map-preview" src="${createMapPreviewDataUri(map)}" alt="${map.name} preview" />
         </div>
       `;
-      button.disabled = !this.isHost() || this.state.matchStarted;
+      button.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted || !this.state.selectedGameId) : false;
       button.addEventListener("click", () => this.selectMap(map.id));
       list.appendChild(button);
     });
@@ -265,7 +337,10 @@ const Lobby = {
     this.elements.currentRoomValue.textContent = this.state.roomId || "None";
     this.elements.playerRoleValue.textContent = this.getRoleLabel();
     this.elements.roomPopulationValue.textContent = `${this.state.players.length}/50`;
-    this.elements.selectedMapValue.textContent = this.getSelectedMap().name;
+    this.elements.selectedGameValue.textContent = this.getSelectedGame()?.name || "None";
+    this.elements.selectedMapValue.textContent = this.state.selectedGameId === "tower-defense"
+      ? this.getSelectedMap().name
+      : "N/A";
     this.elements.selectedTimerValue.textContent = formatDurationMs(this.state.matchDurationMs);
     this.elements.matchStateValue.textContent = this.state.matchStarted ? "Started" : "Waiting";
     this.elements.editQuestionsButton.disabled = !this.isHost();
@@ -275,14 +350,24 @@ const Lobby = {
     this.elements.joinRoomButton.disabled = this.state.connected;
     this.elements.matchDurationInput.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
     this.elements.matchDurationInput.value = formatDurationMs(this.state.matchDurationMs);
+    this.elements.rrDifficultySelect.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
+    this.elements.rrPowerupsEnabled.disabled = this.state.connected ? (!this.isHost() || this.state.matchStarted) : false;
+    this.elements.rrDifficultySelect.value = this.state.rrDifficulty || DEFAULT_RR_DIFFICULTY;
+    this.elements.rrPowerupsEnabled.checked = this.state.rrPowerupsEnabled !== false;
+    const rrControlsVisible = this.state.selectedGameId === "reflect-rumble";
+    this.elements.rrDifficultySelect.closest(".rr-config-row")?.classList.toggle("hidden", !rrControlsVisible);
+    this.renderGames();
     this.renderPlayers();
     this.renderMaps();
   },
   applySnapshot(snapshot) {
     this.state.hostId = snapshot.hostId || "";
     this.state.players = Array.isArray(snapshot.players) ? snapshot.players : [];
+    this.state.selectedGameId = snapshot.selectedGameId || "";
     this.state.selectedMapId = snapshot.selectedMapId || MAPS[0].id;
     this.state.matchDurationMs = Number(snapshot.matchDurationMs) || DEFAULT_MATCH_DURATION_MS;
+    this.state.rrDifficulty = String(snapshot.rrDifficulty || DEFAULT_RR_DIFFICULTY);
+    this.state.rrPowerupsEnabled = snapshot.rrPowerupsEnabled !== false;
     this.state.matchStarted = Boolean(snapshot.matchStarted);
     const self = this.state.players.find((player) => player.id === this.state.playerId);
     if (self?.name) {
@@ -362,7 +447,7 @@ const Lobby = {
     };
   },
   async selectMap(mapId) {
-    if (!this.isHost() || this.state.matchStarted) return;
+    if (!this.isHost() || this.state.matchStarted || this.state.selectedGameId !== "tower-defense") return;
     this.state.selectedMapId = mapId;
     this.updateUI();
     await fetch(this.apiPath("/relay"), {
@@ -376,6 +461,47 @@ const Lobby = {
       })
     }).catch(() => {
       this.elements.lobbyStatusValue.textContent = "Map update failed";
+    });
+  },
+  async selectGame(gameId) {
+    if (this.state.connected && (!this.isHost() || this.state.matchStarted)) return;
+    const previousGameId = this.state.selectedGameId;
+    const previousDefault = getDefaultDurationForGame(previousGameId);
+    const nextDefault = getDefaultDurationForGame(gameId);
+    this.state.selectedGameId = gameId;
+    if (gameId !== "tower-defense") {
+      this.state.selectedMapId = MAPS[0].id;
+    }
+    if (!previousGameId || this.state.matchDurationMs === previousDefault) {
+      this.state.matchDurationMs = nextDefault;
+    }
+    this.updateUI();
+    if (!this.state.connected) return;
+    if (this.state.matchDurationMs === nextDefault) {
+      await fetch(this.apiPath("/relay"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId: this.state.roomId,
+          playerId: this.state.playerId,
+          type: "select_duration",
+          payload: { matchDurationMs: nextDefault }
+        })
+      }).catch(() => {
+        this.elements.lobbyStatusValue.textContent = "Timer update failed";
+      });
+    }
+    await fetch(this.apiPath("/relay"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId: this.state.roomId,
+        playerId: this.state.playerId,
+        type: "select_game",
+        payload: { gameId }
+      })
+    }).catch(() => {
+      this.elements.lobbyStatusValue.textContent = "Game update failed";
     });
   },
   async updateMatchDuration() {
@@ -412,6 +538,42 @@ const Lobby = {
       })
     }).catch(() => {
       this.elements.lobbyStatusValue.textContent = "Timer update failed";
+    });
+  },
+  async updateRRDifficulty() {
+    const difficulty = String(this.elements.rrDifficultySelect.value || DEFAULT_RR_DIFFICULTY).trim().toLowerCase();
+    this.state.rrDifficulty = difficulty;
+    this.updateUI();
+    if (!this.state.connected || !this.isHost() || this.state.matchStarted) return;
+    await fetch(this.apiPath("/relay"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId: this.state.roomId,
+        playerId: this.state.playerId,
+        type: "select_rr_difficulty",
+        payload: { difficulty }
+      })
+    }).catch(() => {
+      this.elements.lobbyStatusValue.textContent = "RR difficulty update failed";
+    });
+  },
+  async updateRRPowerups() {
+    const enabled = Boolean(this.elements.rrPowerupsEnabled.checked);
+    this.state.rrPowerupsEnabled = enabled;
+    this.updateUI();
+    if (!this.state.connected || !this.isHost() || this.state.matchStarted) return;
+    await fetch(this.apiPath("/relay"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        roomId: this.state.roomId,
+        playerId: this.state.playerId,
+        type: "select_rr_powerups",
+        payload: { enabled }
+      })
+    }).catch(() => {
+      this.elements.lobbyStatusValue.textContent = "RR power-up update failed";
     });
   },
   async updatePlayerName() {
@@ -459,8 +621,11 @@ const Lobby = {
       playerId: "",
       hostId: "",
       players: [],
+      selectedGameId: "",
       selectedMapId: MAPS[0].id,
       matchDurationMs: DEFAULT_MATCH_DURATION_MS,
+      rrDifficulty: DEFAULT_RR_DIFFICULTY,
+      rrPowerupsEnabled: true,
       matchStarted: false,
       eventSource: null,
       navigatingToGame: false
@@ -475,11 +640,15 @@ const Lobby = {
       this.clearSession();
     }
     this.state.navigatingToGame = true;
-    window.location.href = "index.html";
+    window.location.href = getGameLaunchPath(this.state.selectedGameId || "tower-defense");
   },
   async enterGame(fromAuto = false) {
     if (!this.state.connected) return;
     if (!this.isHost() && !this.state.matchStarted) return;
+    if (this.isHost() && !this.state.selectedGameId) {
+      this.elements.lobbyStatusValue.textContent = "Choose a game first";
+      return;
+    }
 
     if (this.isHost() && !this.state.matchStarted) {
       const response = await fetch(this.apiPath("/relay"), {
@@ -489,7 +658,7 @@ const Lobby = {
           roomId: this.state.roomId,
           playerId: this.state.playerId,
           type: "lobby_start",
-          payload: { mapId: this.state.selectedMapId }
+          payload: { mapId: this.state.selectedMapId, gameId: this.state.selectedGameId }
         })
       }).catch(() => null);
 
@@ -501,7 +670,7 @@ const Lobby = {
     }
 
     this.state.navigatingToGame = true;
-    window.location.href = "index.html";
+    window.location.href = getGameLaunchPath(this.state.selectedGameId);
   }
 };
 

@@ -8,9 +8,12 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const MAX_ROOM_PLAYERS = 50;
 const DEFAULT_MAP_ID = "meadow-pass";
+const DEFAULT_GAME_ID = "";
 const DEFAULT_MATCH_DURATION_MS = 5 * 60 * 1000;
 const MIN_MATCH_DURATION_MS = 10 * 1000;
 const MAX_MATCH_DURATION_MS = 60 * 60 * 1000;
+const DEFAULT_RR_DIFFICULTY = "medium";
+const DEFAULT_RR_POWERUPS_ENABLED = true;
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -89,10 +92,13 @@ function getOrCreateRoom(roomId) {
       playerGolds: {},
       playerStats: {},
       playerBoards: {},
+      selectedGameId: DEFAULT_GAME_ID,
       selectedMapId: DEFAULT_MAP_ID,
       matchStarted: false,
       matchStartAt: null,
-      matchDurationMs: DEFAULT_MATCH_DURATION_MS
+      matchDurationMs: DEFAULT_MATCH_DURATION_MS,
+      rrDifficulty: DEFAULT_RR_DIFFICULTY,
+      rrPowerupsEnabled: DEFAULT_RR_POWERUPS_ENABLED
     });
   }
   return rooms.get(roomId);
@@ -103,8 +109,19 @@ function createDefaultStats() {
     answered: 0,
     correct: 0,
     totalResponseMs: 0,
-    bestWave: 0
+    bestWave: 0,
+    points: 0,
+    shots: 0,
+    misses: 0,
+    roundsPlayed: 0,
+    roundsCorrect: 0
   };
+}
+
+function sanitizeRRDifficulty(value) {
+  const allowed = new Set(["easy", "medium", "hard"]);
+  const difficulty = String(value || "").trim().toLowerCase();
+  return allowed.has(difficulty) ? difficulty : DEFAULT_RR_DIFFICULTY;
 }
 
 function getPlayer(room, playerId) {
@@ -141,6 +158,9 @@ function buildRoomSnapshot(room) {
     hostId: room.hostId,
     hostQuestions: room.hostQuestions,
     selectedMapId: room.selectedMapId,
+    selectedGameId: room.selectedGameId || DEFAULT_GAME_ID,
+    rrDifficulty: sanitizeRRDifficulty(room.rrDifficulty),
+    rrPowerupsEnabled: room.rrPowerupsEnabled !== false,
     matchStarted: room.matchStarted,
     matchStartAt: room.matchStartAt,
     matchDurationMs: sanitizeMatchDuration(room.matchDurationMs),
@@ -199,6 +219,7 @@ function handleJoin(req, res, body) {
       hostId: room.hostId,
       hostQuestions: room.hostQuestions,
       selectedMapId: room.selectedMapId,
+      selectedGameId: room.selectedGameId || DEFAULT_GAME_ID,
       matchStarted: room.matchStarted,
       matchStartAt: room.matchStartAt,
       matchDurationMs: sanitizeMatchDuration(room.matchDurationMs),
@@ -238,6 +259,7 @@ function handleJoin(req, res, body) {
     hostId: room.hostId,
     hostQuestions: room.hostQuestions,
     selectedMapId: room.selectedMapId,
+    selectedGameId: room.selectedGameId || DEFAULT_GAME_ID,
     matchStarted: room.matchStarted,
     matchStartAt: room.matchStartAt,
     matchDurationMs: sanitizeMatchDuration(room.matchDurationMs),
@@ -298,6 +320,15 @@ function handleRelay(req, res, body) {
   if (body.type === "select_duration" && sender.id === room.hostId && !room.matchStarted) {
     room.matchDurationMs = sanitizeMatchDuration(payload.matchDurationMs);
   }
+  if (body.type === "select_game" && sender.id === room.hostId && !room.matchStarted) {
+    room.selectedGameId = String(payload.gameId || DEFAULT_GAME_ID).trim();
+  }
+  if (body.type === "select_rr_difficulty" && sender.id === room.hostId && !room.matchStarted) {
+    room.rrDifficulty = sanitizeRRDifficulty(payload.difficulty);
+  }
+  if (body.type === "select_rr_powerups" && sender.id === room.hostId && !room.matchStarted) {
+    room.rrPowerupsEnabled = payload.enabled !== false;
+  }
   if (body.type === "lobby_start" && sender.id === room.hostId) {
     room.matchStarted = true;
     room.matchStartAt = Date.now();
@@ -328,6 +359,16 @@ function handleRelay(req, res, body) {
     room.playerBoards[sender.id] = payload && typeof payload === "object" ? payload : null;
     const stats = room.playerStats[sender.id] || createDefaultStats();
     stats.bestWave = Math.max(stats.bestWave || 0, Number(payload?.maxWave || payload?.wave || 0));
+    stats.points = Math.max(Number(stats.points || 0), Math.round(Number(payload?.points || 0)));
+    room.playerStats[sender.id] = stats;
+  }
+  if (body.type === "rr_stats") {
+    const stats = room.playerStats[sender.id] || createDefaultStats();
+    stats.points = Math.max(0, Math.round(Number(payload.points ?? stats.points) || 0));
+    stats.shots = Math.max(0, Math.round(Number(payload.shots ?? stats.shots) || 0));
+    stats.misses = Math.max(0, Math.round(Number(payload.misses ?? stats.misses) || 0));
+    stats.roundsPlayed = Math.max(0, Math.round(Number(payload.roundsPlayed ?? stats.roundsPlayed) || 0));
+    stats.roundsCorrect = Math.max(0, Math.round(Number(payload.roundsCorrect ?? stats.roundsCorrect) || 0));
     room.playerStats[sender.id] = stats;
   }
 
@@ -349,12 +390,16 @@ function handleRelay(req, res, body) {
   if (
     body.type === "health_update" ||
     body.type === "gold_update" ||
+    body.type === "select_game" ||
     body.type === "select_duration" ||
     body.type === "select_map" ||
+    body.type === "select_rr_difficulty" ||
+    body.type === "select_rr_powerups" ||
     body.type === "lobby_start" ||
     body.type === "start_match" ||
     body.type === "question_stats" ||
-    body.type === "reset_run"
+    body.type === "reset_run" ||
+    body.type === "rr_stats"
   ) {
     publishRoom(room);
   }

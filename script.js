@@ -2,6 +2,19 @@ const CUSTOM_QUESTIONS_KEY = "scholar-siege-custom-questions";
 const MULTIPLAYER_SESSION_KEY = "scholar-siege-room-session";
 const MULTIPLAYER_RESULTS_KEY = "scholar-siege-results-snapshot";
 let skipMultiplayerLeaveOnUnload = false;
+let lastQuestionBankSignature = "";
+const GAMES = [
+  {
+    id: "tower-defense",
+    name: "Tower Defense",
+    description: "Defend the path, build towers, answer questions, and outlast the room."
+  },
+  {
+    id: "reflect-rumble",
+    name: "Reflect Rumble",
+    description: "Fast arcade FPS action powered by the files in the fps folder."
+  }
+];
 
 function getCustomQuestions() {
   try {
@@ -48,18 +61,26 @@ function formatDuration(seconds) {
 }
 
 function refreshQuestionBank() {
+  let nextQuestions;
   if (typeof MultiplayerManager !== "undefined" && MultiplayerManager.state.connected) {
-    questions = MultiplayerManager.getQuestionBank();
-    if (typeof QuestionManager !== "undefined" && QuestionManager.rebuildQuestionOrder) {
-      QuestionManager.rebuildQuestionOrder();
-    }
+    nextQuestions = MultiplayerManager.getQuestionBank();
+  } else {
+    nextQuestions = loadQuestionBank();
+  }
+  const signature = JSON.stringify(nextQuestions || []);
+  if (signature === lastQuestionBankSignature) {
     return questions;
   }
-  questions = loadQuestionBank();
+  lastQuestionBankSignature = signature;
+  questions = Array.isArray(nextQuestions) ? nextQuestions : [];
   if (typeof QuestionManager !== "undefined" && QuestionManager.rebuildQuestionOrder) {
     QuestionManager.rebuildQuestionOrder();
   }
   return questions;
+}
+
+function getGameLaunchPath(gameId) {
+  return gameId === "reflect-rumble" ? "fps/brainrush-arcade-launcher.html" : "index.html";
 }
 
 function shuffleArray(items) {
@@ -278,6 +299,7 @@ const GameState = {
       hp: this.baseHp,
       gold: this.startingGold,
       wave: 0,
+      selectedGameId: "",
       currentMapId: MAPS[0].id,
       enemies: [],
       towers: [],
@@ -301,7 +323,8 @@ const GameState = {
       spectatedPlayerId: null,
       waveButtonCooldownUntil: 0,
       multiplayerResultsRedirected: false,
-      maxWaveReached: 0
+      maxWaveReached: 0,
+      uiRefreshTimer: 0
     };
   },
   reset() {
@@ -311,12 +334,8 @@ const GameState = {
     QuestionManager.reset();
     UIManager.hideRestartModal();
     UIManager.hideGameOver();
-    if (typeof MultiplayerManager !== "undefined" && !MultiplayerManager.state.connected) {
-      this.state.isPreMatch = true;
-      UIManager.showPreMatch();
-    } else {
-      UIManager.hidePreMatch();
-    }
+    this.state.isPreMatch = false;
+    UIManager.hidePreMatch();
     UIManager.updateAll();
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportHealth(true);
     if (typeof MultiplayerManager !== "undefined") MultiplayerManager.reportGold(true);
@@ -856,6 +875,7 @@ const UIManager = {
   elements: {},
   lastHealthRenderKey: "",
   lastSpectatorRenderKey: "",
+  lastSelectedTowerRenderKey: "",
   init() {
     this.elements = {
       hpValue: document.getElementById("hpValue"),
@@ -878,6 +898,7 @@ const UIManager = {
       restartButton: document.getElementById("restartButton"),
       startWaveButton: document.getElementById("startWaveButton"),
       answerQuestionButton: document.getElementById("answerQuestionButton"),
+      cancelPlacementButton: document.getElementById("cancelPlacementButton"),
       bombButton: document.getElementById("bombButton"),
       freezeButton: document.getElementById("freezeButton"),
       bombCooldownValue: document.getElementById("bombCooldownValue"),
@@ -888,11 +909,6 @@ const UIManager = {
       gameOverSummary: document.getElementById("gameOverSummary"),
       spectatorPanel: document.getElementById("spectatorPanel"),
       spectatorHealthList: document.getElementById("spectatorHealthList"),
-      preMatchOverlay: document.getElementById("preMatchOverlay"),
-      mapSelectionList: document.getElementById("mapSelectionList"),
-      startMatchButton: document.getElementById("startMatchButton"),
-      mapIntroText: document.getElementById("mapIntroText"),
-      preMatchQuestionLink: document.getElementById("preMatchQuestionLink"),
       roomStatusValue: document.getElementById("roomStatusValue"),
       currentRoomName: document.getElementById("currentRoomName"),
       leaveRoomButton: document.getElementById("leaveRoomButton"),
@@ -911,36 +927,8 @@ const UIManager = {
     };
     this.renderTowerShop();
     this.renderInvasionPanel();
-    this.renderMapSelection();
     this.renderBoardHealth();
     this.updateAll();
-  },
-  renderMapSelection() {
-    this.elements.mapSelectionList.innerHTML = "";
-    MAPS.forEach((map) => {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = `map-card${GameState.state.currentMapId === map.id ? " selected" : ""}`;
-      const previewSrc = createMapPreviewDataUri(map);
-      card.innerHTML = `
-        <div class="map-card-layout">
-          <div class="map-card-copy">
-            <h3>${map.name}</h3>
-            <p>${map.description}</p>
-            <div class="map-meta">
-              <span>${map.difficulty}</span>
-              <span>${map.points.length - 1} segments</span>
-            </div>
-          </div>
-          <img class="map-preview" src="${previewSrc}" alt="${map.name} preview" />
-        </div>
-      `;
-      card.addEventListener("click", () => {
-        GameState.state.currentMapId = map.id;
-        this.renderMapSelection();
-      });
-      this.elements.mapSelectionList.appendChild(card);
-    });
   },
   renderTowerShop() {
     this.elements.towerShop.innerHTML = "";
@@ -1084,11 +1072,12 @@ const UIManager = {
     this.elements.topBar?.classList.toggle("solo-mode", !MultiplayerManager.state.connected || !MultiplayerManager.state.matchStartAt);
     this.elements.pauseButton.textContent = isPaused ? "Resume" : "Pause";
     this.elements.pausedOverlay.classList.toggle("hidden", !isPaused || isGameOver);
-    this.elements.startMatchButton.disabled = MultiplayerManager.state.connected && !MultiplayerManager.isHost();
     const waveButtonCoolingDown = Date.now() < (GameState.state.waveButtonCooldownUntil || 0);
     this.elements.startWaveButton.textContent = waveInProgress ? "Skip Wave" : "Start Wave";
     this.elements.startWaveButton.disabled = actionLocked || waveButtonCoolingDown;
     this.elements.answerQuestionButton.disabled = actionLocked;
+    this.elements.cancelPlacementButton.classList.toggle("hidden", !pendingPlacement);
+    this.elements.cancelPlacementButton.disabled = !pendingPlacement;
     this.elements.bombButton.disabled = actionLocked || abilityCooldowns.bomb > 0;
     this.elements.freezeButton.disabled = actionLocked || abilityCooldowns.freeze > 0;
     const raidLocked = actionLocked || !MultiplayerManager.canSendRaid();
@@ -1137,31 +1126,57 @@ const UIManager = {
     const panel = this.elements.selectedTowerPanel;
     if (!panel) return;
     if (!tower) {
+      this.lastSelectedTowerRenderKey = "";
       panel.className = "selected-panel floating hidden";
       panel.innerHTML = "";
       return;
     }
     const next = tower.getUpgradeData();
+    const panelKey = JSON.stringify({
+      id: tower.id,
+      level: tower.level,
+      damage: tower.stats.damage,
+      range: tower.stats.range,
+      fireRate: tower.stats.fireRate,
+      farmBonus: tower.getFarmBonus(),
+      sellValue: tower.getSellValue(),
+      next,
+      gold: GameState.state.gold
+    });
+    if (panelKey === this.lastSelectedTowerRenderKey) {
+      this.positionSelectedTowerPanel(tower);
+      return;
+    }
+    this.lastSelectedTowerRenderKey = panelKey;
     panel.className = "selected-panel floating";
     panel.innerHTML = `
-      <h3>${tower.name}</h3>
-      <p>Level ${tower.level + 1} ${tower.type === "farm" ? "economic support" : "combat platform"}.</p>
-      <div class="tower-stats">
-        <span>Damage: ${tower.stats.damage}</span>
-        <span>Range: ${tower.stats.range || "None"}</span>
-        <span>${tower.type === "farm" ? `Bonus: +${Math.round(tower.getFarmBonus() * 100)}%` : `Cooldown: ${tower.stats.fireRate.toFixed(2)}s`}</span>
-        <span>Sell: ${tower.getSellValue()}g</span>
+      <div class="selected-panel-header">
+        <div>
+          <h3>${tower.name}</h3>
+          <p>Level ${tower.level + 1} ${tower.type === "farm" ? "economic support" : "combat platform"}.</p>
+        </div>
+        <span class="selected-level-pill">L${tower.level + 1}</span>
       </div>
-      <div class="upgrade-preview">
+      <div class="selected-stat-grid">
+        <span><strong>Damage</strong><em>${tower.stats.damage}</em></span>
+        <span><strong>Range</strong><em>${tower.stats.range || "None"}</em></span>
+        <span><strong>${tower.type === "farm" ? "Bonus" : "Cooldown"}</strong><em>${tower.type === "farm" ? `+${Math.round(tower.getFarmBonus() * 100)}%` : `${tower.stats.fireRate.toFixed(2)}s`}</em></span>
+        <span><strong>Sell</strong><em>${tower.getSellValue()}g</em></span>
+      </div>
+      <div class="upgrade-preview ${next ? "" : "maxed"}">
+        <div class="upgrade-preview-title">${next ? "Next Upgrade" : "Maxed Out"}</div>
         ${next
-          ? `<span>Next cost: ${next.cost}g</span>
-             <span>${tower.type === "farm" ? `Next bonus: +${Math.round((next.farmBonus || 0) * 100)}%` : `Next damage: ${next.damage}`}</span>
-             <span>${tower.type === "farm" ? "Next range: None" : `Next range: ${next.range}`}</span>
-             <span>${tower.type === "farm" ? "Next fire: None" : `Next cooldown: ${next.fireRate.toFixed(2)}s`}</span>`
-          : `<span>Max level reached</span><span>No further upgrades</span><span>Keep defending</span><span>Sell any time</span>`}
+          ? `<span><strong>Cost</strong><em>${next.cost}g</em></span>
+             <span><strong>${tower.type === "farm" ? "Bonus" : "Damage"}</strong><em>${tower.type === "farm" ? `+${Math.round((next.farmBonus || 0) * 100)}%` : next.damage}</em></span>
+             <span><strong>Range</strong><em>${tower.type === "farm" ? "None" : next.range}</em></span>
+             <span><strong>${tower.type === "farm" ? "Cooldown" : "Cooldown"}</strong><em>${tower.type === "farm" ? "None" : `${next.fireRate.toFixed(2)}s`}</em></span>`
+          : `<span><strong>Status</strong><em>Max level reached</em></span>
+             <span><strong>Upgrade</strong><em>None left</em></span>
+             <span><strong>Role</strong><em>Keep defending</em></span>
+             <span><strong>Option</strong><em>Sell any time</em></span>`}
       </div>
       <div class="selected-actions">
-        <button id="upgradeTowerButton" class="primary-button" ${next ? "" : "disabled"}>Upgrade</button>
+        <button id="upgradeTowerButton" class="primary-button" ${(next && GameState.state.gold >= next.cost) ? "" : "disabled"}>${next ? `Upgrade (${next.cost}g)` : "Max Level"}</button>
         <button id="sellTowerButton" class="danger-button">Sell</button>
       </div>
     `;
@@ -1263,34 +1278,8 @@ const UIManager = {
       restartButton.textContent = "Restart Run";
     }
   },
-  showPreMatch() {
-    if (!this.elements.preMatchOverlay) return;
-    if (MultiplayerManager.state.connected) {
-      const roomMap = MAPS.find((map) => map.id === MultiplayerManager.state.selectedMapId) || MAPS[0];
-      this.elements.mapSelectionList.innerHTML = `<div class="empty-state">Room map: ${roomMap.name}. Select maps and start the match from the lobby.</div>`;
-      this.elements.mapIntroText.textContent = MultiplayerManager.state.matchStarted
-        ? "The room match is launching."
-        : (MultiplayerManager.isHost()
-          ? `Room map is ${roomMap.name}. Start the room match here or from the lobby.`
-          : "Waiting for the host to start the room match.");
-      this.elements.preMatchQuestionLink.classList.add("hidden");
-      this.elements.startMatchButton.disabled = !MultiplayerManager.isHost();
-      if (MultiplayerManager.state.matchStarted) {
-        this.hidePreMatch();
-        return;
-      }
-    } else {
-      this.renderMapSelection();
-      this.elements.mapIntroText.textContent = "Pick a battlefield before the match begins.";
-      this.elements.preMatchQuestionLink.classList.toggle("hidden", questions.length > 0);
-      this.elements.startMatchButton.disabled = false;
-    }
-    this.elements.preMatchOverlay.classList.remove("hidden");
-  },
-  hidePreMatch() {
-    if (!this.elements.preMatchOverlay) return;
-    this.elements.preMatchOverlay.classList.add("hidden");
-  }
+  showPreMatch() {},
+  hidePreMatch() {}
 };
 
 const MultiplayerManager = {
@@ -1303,6 +1292,7 @@ const MultiplayerManager = {
     players: [],
     hostQuestions: [],
     selectedMapId: MAPS[0].id,
+    selectedGameId: "",
     matchStarted: false,
     matchStartAt: null,
     matchDurationMs: 5 * 60 * 1000,
@@ -1433,6 +1423,7 @@ const MultiplayerManager = {
       this.state.hostQuestions = Array.isArray(payload.hostQuestions) ? payload.hostQuestions : [];
       this.state.players = Array.isArray(payload.players) ? payload.players : [];
       this.state.selectedMapId = payload.selectedMapId || MAPS[0].id;
+      GameState.state.selectedGameId = payload.selectedGameId || "";
       this.state.matchStarted = Boolean(payload.matchStarted);
       this.state.matchStartAt = payload.matchStartAt || null;
       this.state.matchDurationMs = payload.matchDurationMs || this.state.matchDurationMs;
@@ -1526,6 +1517,7 @@ const MultiplayerManager = {
     this.state.players = Array.isArray(snapshot.players) ? snapshot.players : [];
     this.state.boards = Object.fromEntries(this.state.players.map((player) => [player.id, player.board || null]));
     this.state.selectedMapId = snapshot.selectedMapId || this.state.selectedMapId;
+    GameState.state.selectedGameId = snapshot.selectedGameId || GameState.state.selectedGameId || "";
     this.state.matchStarted = Boolean(snapshot.matchStarted);
     this.state.matchStartAt = snapshot.matchStartAt || this.state.matchStartAt;
     this.state.matchDurationMs = snapshot.matchDurationMs || this.state.matchDurationMs;
@@ -1738,6 +1730,7 @@ const Game = {
   },
   bindEvents() {
     document.getElementById("answerQuestionButton").addEventListener("click", () => this.askFreeQuestion());
+    document.getElementById("cancelPlacementButton").addEventListener("click", () => this.cancelPendingTowerPurchase());
     document.getElementById("startWaveButton").addEventListener("click", () => {
       if (GameState.state.waveInProgress) this.skipWave();
       else this.requestWaveStart();
@@ -1795,7 +1788,6 @@ const Game = {
     });
     document.getElementById("bombButton").addEventListener("click", () => this.requestAbility("bomb"));
     document.getElementById("freezeButton").addEventListener("click", () => this.requestAbility("freeze"));
-    document.getElementById("startMatchButton").addEventListener("click", () => this.startMatch());
     document.getElementById("leaveRoomButton").addEventListener("click", () => MultiplayerManager.leaveRoom());
 
     this.canvas.addEventListener("mousemove", (event) => {
@@ -1852,15 +1844,21 @@ const Game = {
     const { skipRelay = false, remoteMapId = null } = options;
     if (remoteMapId) {
       GameState.state.currentMapId = remoteMapId;
-      UIManager.renderMapSelection();
+    }
+    if (!GameState.state.selectedGameId) {
+      UIManager.setStatus("Choose a game first");
+      return;
     }
     if (!skipRelay && MultiplayerManager.state.connected && !MultiplayerManager.isHost()) {
       UIManager.setStatus("Only the host can start the room match");
       return;
     }
+    if (GameState.state.selectedGameId === "reflect-rumble") {
+      window.location.href = getGameLaunchPath("reflect-rumble");
+      return;
+    }
     if (MultiplayerManager.state.connected) {
       GameState.state.currentMapId = MultiplayerManager.state.selectedMapId || GameState.state.currentMapId;
-      UIManager.renderMapSelection();
     }
     refreshQuestionBank();
     if (!skipRelay && MultiplayerManager.state.connected && MultiplayerManager.isHost()) {
@@ -1873,7 +1871,6 @@ const Game = {
       GameState.state.multiplayerResultsRedirected = false;
     }
     GameState.state.isPreMatch = false;
-    UIManager.hidePreMatch();
     GameState.state.autoWaveCountdown = MultiplayerManager.state.connected ? WaveManager.preWaveDelay : 0;
     if (!skipRelay && MultiplayerManager.state.connected) {
       await MultiplayerManager.broadcastMatchStart(GameState.state.currentMapId);
@@ -2044,6 +2041,13 @@ const Game = {
     GameState.state.selectedTowerId = selected ? selected.id : null;
     UIManager.updateSelectedTower();
   },
+  cancelPendingTowerPurchase() {
+    if (!GameState.state.pendingPlacement) return;
+    const canceledTower = towerCatalog[GameState.state.pendingPlacement];
+    GameState.state.pendingPlacement = null;
+    UIManager.setStatus(canceledTower ? `${canceledTower.name} purchase canceled` : "Tower purchase canceled");
+    UIManager.updateAll();
+  },
   setSpectatedPlayer(playerId) {
     if (!GameState.isMultiplayerSpectating()) return;
     if (!MultiplayerManager.state.boards[playerId]) {
@@ -2180,7 +2184,11 @@ const Game = {
     MultiplayerManager.reportGold();
     MultiplayerManager.reportBoard();
     MultiplayerManager.maybeRedirectToResults();
-    UIManager.updateAll();
+    GameState.state.uiRefreshTimer += deltaTime;
+    if (GameState.state.uiRefreshTimer >= 0.1) {
+      GameState.state.uiRefreshTimer = 0;
+      UIManager.updateAll();
+    }
   },
   draw() {
     const ctx = this.ctx;

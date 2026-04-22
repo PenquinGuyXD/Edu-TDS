@@ -48,15 +48,6 @@
               <button id="gameOverRestartButton" class="primary-button">Restart Run</button>
             </div>
           </div>
-          <div id="preMatchOverlay" class="overlay hidden">
-            <div class="overlay-card pre-match-card">
-              <h2>Choose Your Map</h2>
-              <p id="mapIntroText">Pick a battlefield before the match begins.</p>
-              <a id="preMatchQuestionLink" href="questions.html" class="secondary-button panel-link-button hidden">Create Custom Questions</a>
-              <div id="mapSelectionList" class="map-selection-list"></div>
-              <button id="startMatchButton" class="primary-button" type="button">Start Match</button>
-            </div>
-          </div>
         </div>
         <section class="board-health-panel">
           <div class="panel-header">
@@ -137,6 +128,7 @@
             <h2>Build Towers</h2>
             <p>Select a tower, answer a question, then place it on the field.</p>
           </div>
+          <button id="cancelPlacementButton" class="secondary-button hidden" type="button">Cancel Buying Tower</button>
           <details class="dropdown-panel" open>
             <summary>Tower Shop</summary>
             <div class="dropdown-content">

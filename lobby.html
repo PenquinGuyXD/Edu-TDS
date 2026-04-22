@@ -44,6 +44,7 @@
           <div><span>Room</span><strong id="currentRoomValue">None</strong></div>
           <div><span>You</span><strong id="playerRoleValue">Solo</strong></div>
           <div><span>Players</span><strong id="roomPopulationValue">0/50</strong></div>
+          <div><span>Game</span><strong id="selectedGameValue">None</strong></div>
           <div><span>Map</span><strong id="selectedMapValue">Meadow Pass</strong></div>
           <div><span>Timer</span><strong id="selectedTimerValue">5:00</strong></div>
           <div><span>Match</span><strong id="matchStateValue">Waiting</strong></div>
@@ -60,12 +61,32 @@
     </section>
 
     <section class="lobby-card">
-      <h2>Map Selection</h2>
-      <p class="section-copy">Only the host can select the battlefield. Everyone must wait in the lobby until the host starts the match.</p>
+      <h2>Game Selection</h2>
+      <p class="section-copy">Choose a game first. Once a game is selected, the host can pick a map for that mode.</p>
+      <div id="gameSelectionList" class="game-selection-list"></div>
+    </section>
+
+    <section class="lobby-card">
+      <h2>Settings</h2>
+      <p class="section-copy">Only the host can select the battlefield after choosing a game. Everyone must wait in the lobby until the host starts the match.</p>
       <div class="timer-config-row">
         <label class="timer-config-label" for="matchDurationInput">
           <span>Match Timer</span>
           <input id="matchDurationInput" type="text" inputmode="numeric" value="5:00" placeholder="5:00" maxlength="5">
+        </label>
+      </div>
+      <div class="rr-config-row">
+        <label class="timer-config-label" for="rrDifficultySelect">
+          <span>RR Difficulty</span>
+          <select id="rrDifficultySelect">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+        <label class="rr-toggle-label" for="rrPowerupsEnabled">
+          <span>RR Power Ups</span>
+          <input id="rrPowerupsEnabled" type="checkbox" checked>
         </label>
       </div>
       <div id="mapSelectionList" class="map-selection-list"></div>

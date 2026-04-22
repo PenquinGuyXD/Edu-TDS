@@ -28,6 +28,10 @@ button, input {
   font: inherit;
 }
 
+select {
+  font: inherit;
+}
+
 button {
   border: 0;
   border-radius: 12px;
@@ -42,6 +46,15 @@ button:disabled {
 }
 
 input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+select {
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
@@ -165,14 +178,76 @@ label span,
   padding-right: 6px;
 }
 
+.game-selection-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.game-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.game-card.selected {
+  border-color: rgba(83, 216, 167, 0.72);
+  background: rgba(83, 216, 167, 0.1);
+}
+
+.game-card h3,
+.game-card p {
+  margin: 0;
+}
+
+.game-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
 .timer-config-row {
   margin-top: 14px;
   display: flex;
   justify-content: flex-start;
 }
 
+.rr-config-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(180px, 220px);
+  gap: 12px;
+  align-items: end;
+}
+
+.rr-config-row.hidden {
+  display: none;
+}
+
 .timer-config-label {
   width: min(220px, 100%);
+}
+
+.rr-toggle-label {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.rr-toggle-label input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
 }
 
 .map-card {
@@ -244,7 +319,8 @@ label span,
 @media (max-width: 820px) {
   .lobby-grid,
   .button-row,
-  .status-grid {
+  .status-grid,
+  .rr-config-row {
     grid-template-columns: 1fr;
   }
 }
