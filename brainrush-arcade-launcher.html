@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reflect Rumble</title>
+  <link rel="stylesheet" href="arcade-spectrum-skin.css">
+</head>
+<body>
+  <main id="game-frame" class="game-frame" aria-live="polite">
+    <section id="game-screen" class="screen active">
+      <header class="hud">
+        <div><span class="hud-label">Difficulty</span><strong id="difficulty-display">Medium</strong></div>
+        <div><span class="hud-label">Round</span><strong id="round-display">1</strong></div>
+        <div><span class="hud-label">Timer</span><strong id="timer-display">15s</strong></div>
+        <div><span class="hud-label">Points</span><strong id="points-display">0</strong></div>
+        <div><span class="hud-label">Opponent</span><strong id="opponent-points-display">0</strong></div>
+        <div><span class="hud-label">Power Ups</span><strong id="powerup-state">Enabled</strong></div>
+      </header>
+      <p id="multiplayer-banner" class="multiplayer-banner hidden">Offline mode</p>
+      <section id="game-panel" class="game-panel">
+        <div id="arena-grid" class="arena-grid"></div>
+      </section>
+      <p id="feedback" class="feedback">Ready?</p>
+      <button id="offlineStartButton" class="primary-btn return-lobby-inline">Start Match</button>
+      <button id="return-lobby-inline-btn" class="secondary-btn return-lobby-inline">Return To Lobby</button>
+    </section>
+
+    <section id="game-over-screen" class="screen">
+      <div class="game-over-card">
+        <p class="eyebrow">Game Over</p>
+        <h2 id="game-over-title">Run complete</h2>
+        <p id="final-score">0</p>
+        <p id="best-score"></p>
+        <div class="game-over-actions">
+          <button id="restart-btn" class="primary-btn">Restart</button>
+          <button id="menu-btn" class="secondary-btn">Return To Lobby</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="velocity-quiz-core.js"></script>
+</body>
+</html>

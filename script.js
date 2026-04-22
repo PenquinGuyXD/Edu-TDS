@@ -80,7 +80,7 @@ function refreshQuestionBank() {
 }
 
 function getGameLaunchPath(gameId) {
-  return gameId === "reflect-rumble" ? "fps/brainrush-arcade-launcher.html" : "index.html";
+  return gameId === "reflect-rumble" ? "brainrush-arcade-launcher.html" : "index.html";
 }
 
 function shuffleArray(items) {
