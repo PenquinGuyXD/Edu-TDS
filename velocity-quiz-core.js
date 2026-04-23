@@ -265,6 +265,10 @@ const RRMultiplayer = {
       game.applyRemoteItem(message.payload);
       return;
     }
+    if (message.type === "rr_powerup_reward") {
+      game.grantRoomPowerUpReward(message.payload);
+      return;
+    }
     if (message.type === "rr_siphon_gain" && message.target === this.state.playerId) {
       game.losePointsFromOpponent(Number(message.payload?.amount || 0), message.payload?.senderName || "Opponent");
       return;
@@ -304,6 +308,10 @@ const RRMultiplayer = {
     const opponent = this.getOpponent();
     if (!opponent) return;
     await this.relay("rr_item", { type, senderName: this.state.playerName }, opponent.id);
+  },
+  async rewardRoomPowerUp(type) {
+    if (!this.state.connected) return;
+    await this.relay("rr_powerup_reward", { type, senderName: this.state.playerName });
   },
   async siphonTransfer(amount) {
     const opponent = this.getOpponent();
@@ -740,6 +748,18 @@ class ReflectRumbleGame {
     this.reportStats();
   }
 
+  grantRoomPowerUpReward(payload) {
+    if (!RRMultiplayer.state.connected) return;
+    const type = String(payload?.type || "").trim();
+    if (!POWER_UPS[type]) return;
+    this.player.inventory[type] += 1;
+    this.setFeedback(`${payload?.senderName || "A player"} earned a ${POWER_UPS[type].label} for everyone.`, "info");
+    if (this.player.board) {
+      this.renderArenaBoard();
+    }
+    this.reportStats();
+  }
+
   releaseExpiredEffects(now) {
     const board = this.player.board;
     if (!board) return;
@@ -772,6 +792,10 @@ class ReflectRumbleGame {
       await RRMultiplayer.siphonTransfer(points);
     }
     this.player.score += points;
+    if (RRMultiplayer.state.connected && this.powerUpsEnabled) {
+      const rewardType = POWER_UP_KEYS[Math.floor(Math.random() * POWER_UP_KEYS.length)];
+      await RRMultiplayer.rewardRoomPowerUp(rewardType);
+    }
     board.statusText = `Correct +${points}`;
     this.setFeedback(`Correct! +${points}`, "correct");
     this.reportStats();
