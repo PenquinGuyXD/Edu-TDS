@@ -703,7 +703,7 @@ class ReflectRumbleGame {
     this.player.inventory[type] -= 1;
     this.player.itemCooldownUntil = performance.now() + ITEM_COOLDOWN_MS;
     const until = performance.now() + POWER_UP_DURATIONS[type];
-    if (type === "inkBomb") {
+    if (type === "inkBomb" && !RRMultiplayer.state.connected) {
       this.player.effects.inkBomb.until = until;
       this.setFeedback("Ink Bomb active.", "info");
     } else if (type === "siphon") {
@@ -730,7 +730,9 @@ class ReflectRumbleGame {
     const board = this.player.board;
     if (!board || board.answered) return;
     const until = performance.now() + POWER_UP_DURATIONS[type];
-    if (type === "shrinkRay") {
+    if (type === "inkBomb") {
+      this.player.effects.inkBomb.until = until;
+    } else if (type === "shrinkRay") {
       this.player.effects.shrinkRay.until = until;
       board.targets.forEach((target) => { target.radius = Math.max(20, target.radius * SHRINK_FACTOR); });
     } else if (type === "speedEnhancer") {
@@ -792,7 +794,7 @@ class ReflectRumbleGame {
       await RRMultiplayer.siphonTransfer(points);
     }
     this.player.score += points;
-    if (RRMultiplayer.state.connected && this.powerUpsEnabled) {
+    if (RRMultiplayer.state.connected && this.powerUpsEnabled && this.difficultyKey === "easy") {
       const rewardType = POWER_UP_KEYS[Math.floor(Math.random() * POWER_UP_KEYS.length)];
       await RRMultiplayer.rewardRoomPowerUp(rewardType);
     }

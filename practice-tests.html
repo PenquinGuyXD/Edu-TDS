@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Practice Tests</title>
+  <link rel="stylesheet" href="practice-tests.css">
+</head>
+<body>
+  <main class="practice-shell">
+    <section class="practice-card hero-card">
+      <p class="eyebrow">Offline Mode</p>
+      <h1>Practice Tests</h1>
+      <p id="practiceStatus" class="hero-copy">Load your custom questions, take the test, and review your analytics at the end.</p>
+      <div class="hero-actions">
+        <button id="startPracticeButton" class="primary-button">Start Test</button>
+        <a class="secondary-button link-button" href="lobby.html">Back To Lobby</a>
+      </div>
+    </section>
+
+    <section id="practiceTestCard" class="practice-card test-card hidden">
+      <div class="test-topbar">
+        <div><span>Question</span><strong id="questionProgress">1</strong></div>
+        <div><span>Correct</span><strong id="correctCount">0</strong></div>
+        <div><span>Accuracy</span><strong id="accuracyValue">0%</strong></div>
+      </div>
+      <div class="test-controls">
+        <button id="practiceSettingsButton" type="button" class="secondary-button">Settings</button>
+        <div id="practiceSettingsMenu" class="settings-menu hidden">
+          <label class="settings-toggle">
+            <span>Timed Per Question</span>
+            <input id="timedModeToggle" type="checkbox">
+          </label>
+          <p class="settings-note">When enabled, each question has 15 seconds before it is marked incorrect.</p>
+        </div>
+        <div id="questionTimerChip" class="timer-chip hidden">15s</div>
+      </div>
+      <h2 id="questionPrompt">Question prompt</h2>
+      <div id="answerOptions" class="options-grid"></div>
+      <p id="questionFeedback" class="question-feedback">Choose the best answer.</p>
+      <div class="hero-actions">
+        <button id="endPracticeButton" class="secondary-button">End Test</button>
+      </div>
+    </section>
+
+    <section id="practiceResultsCard" class="practice-card results-card hidden">
+      <p class="eyebrow">Practice Complete</p>
+      <h2>Review Analytics</h2>
+      <p class="hero-copy">A breakdown of your custom-question practice run.</p>
+      <div class="results-layout">
+        <div class="accuracy-ring" id="practiceAccuracyRing" style="--ring-angle:0deg">
+          <span id="practiceAccuracyText">0%</span>
+        </div>
+        <div class="results-metrics">
+          <div class="metric-card">
+            <strong id="practiceAverageResponse">0.00s</strong>
+            <span>Avg Response</span>
+          </div>
+          <div class="metric-card">
+            <strong id="practiceCorrectAnswers">0 / 0</strong>
+            <span>Correct Answers</span>
+          </div>
+          <div class="metric-card">
+            <strong id="practiceMissedAnswers">0%</strong>
+            <span>Miss Rate</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button id="continuePracticeButton" class="primary-button hidden">Continue</button>
+        <button id="restartPracticeButton" class="primary-button">Restart Test</button>
+        <a class="secondary-button link-button" href="questions.html">Edit Questions</a>
+        <a class="secondary-button link-button" href="lobby.html">Back To Lobby</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="practice-tests.js"></script>
+</body>
+</html>

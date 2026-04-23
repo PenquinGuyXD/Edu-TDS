@@ -54,6 +54,7 @@ function sortPlayers(players) {
 }
 
 function renderResults(roomId, playerId, players) {
+  const isSolo = roomId === "solo";
   document.getElementById("resultsRoomLabel").textContent = roomId === "solo"
     ? "Solo Reflect Rumble results"
     : `Room ${String(roomId || "").toUpperCase()} Reflect Rumble standings`;
@@ -67,7 +68,7 @@ function renderResults(roomId, playerId, players) {
     card.className = "result-card";
     card.innerHTML = `
       <div class="player-copy">
-        <h3><span class="inline-rank">#${index + 1}</span>${player.name}${player.id === playerId ? " (You)" : ""}</h3>
+        <h3>${isSolo ? "" : `<span class="inline-rank">#${index + 1}</span>`}${player.name}${player.id === playerId ? " (You)" : ""}</h3>
         <p>${player.side === "host" ? "Host" : player.side === "solo" ? "Solo" : "Player"} | ${points} pts</p>
       </div>
       <div class="accuracy-ring" style="--ring-angle:${accuracy * 3.6}deg">

@@ -12,6 +12,11 @@ const GAMES = [
     id: "reflect-rumble",
     name: "Reflect Rumble",
     description: "Fast arcade FPS action powered by the files in the fps folder."
+  },
+  {
+    id: "practice-tests",
+    name: "Practice Tests",
+    description: "Take a custom-question practice test and review analytics at the end."
   }
 ];
 
@@ -139,7 +144,9 @@ function getDefaultDurationForGame(gameId) {
 }
 
 function getGameLaunchPath(gameId) {
-  return gameId === "reflect-rumble" ? "brainrush-arcade-launcher.html" : "index.html";
+  if (gameId === "reflect-rumble") return "brainrush-arcade-launcher.html";
+  if (gameId === "practice-tests") return "practice-tests.html";
+  return "index.html";
 }
 
 function createFreshRoomCode() {
@@ -268,6 +275,9 @@ const Lobby = {
   renderGames() {
     const list = this.elements.gameSelectionList;
     list.innerHTML = "";
+    const visibleGames = (this.state.currentView === "online" || this.state.connected)
+      ? GAMES.filter((game) => game.id !== "practice-tests")
+      : GAMES;
     if (this.state.connected && !this.isHost()) {
       const notice = document.createElement("div");
       notice.className = "room-player-empty";
@@ -275,7 +285,7 @@ const Lobby = {
       list.appendChild(notice);
       return;
     }
-    GAMES.forEach((game) => {
+    visibleGames.forEach((game) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = `game-card${this.state.selectedGameId === game.id ? " selected" : ""}`;
@@ -376,6 +386,8 @@ const Lobby = {
     this.elements.rrDifficultySelect.value = this.state.rrDifficulty || DEFAULT_RR_DIFFICULTY;
     this.elements.rrPowerupsEnabled.checked = this.state.rrPowerupsEnabled !== false;
     const rrControlsVisible = this.state.selectedGameId === "reflect-rumble";
+    const timerVisible = this.state.selectedGameId !== "practice-tests";
+    this.elements.matchDurationInput.closest(".timer-config-row")?.classList.toggle("hidden", !timerVisible);
     this.elements.rrDifficultySelect.closest(".rr-config-row")?.classList.toggle("hidden", !rrControlsVisible);
     this.renderGames();
     this.renderPlayers();
