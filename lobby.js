@@ -143,7 +143,7 @@ function getGameLaunchPath(gameId) {
 }
 
 function createFreshRoomCode() {
-  return `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  return `room-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 const Lobby = {
