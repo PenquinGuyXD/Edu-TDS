@@ -31,6 +31,7 @@ const POWER_UP_KEYS = Object.keys(POWER_UPS);
 const POWER_UP_DURATIONS = { inkBomb: 4000, shrinkRay: 5500, speedEnhancer: 5500, siphon: 7000 };
 const SHRINK_FACTOR = 0.68;
 const SPEED_FACTOR = 1.45;
+const SIPHON_STEAL_POINTS = 200;
 const PICKUP_TTL_MS = 2600;
 const GRAVITY = 520;
 const ARENA_WIDTH = 760;
@@ -274,11 +275,12 @@ const RRMultiplayer = {
       return;
     }
   },
-  getOpponent() {
-    return this.state.players.find((player) => player.id !== this.state.playerId) || null;
+  getOpponents() {
+    return this.state.players.filter((player) => player.id !== this.state.playerId);
   },
   getOpponentPoints() {
-    return Number(this.getOpponent()?.stats?.points || this.getOpponent()?.board?.points || 0);
+    const opponents = this.getOpponents();
+    return Number(opponents[0]?.stats?.points || opponents[0]?.board?.points || 0);
   },
   getMatchSecondsRemaining() {
     if (!this.state.connected || !this.state.matchStartAt) return 0;
@@ -305,18 +307,22 @@ const RRMultiplayer = {
     await this.relay("board_update", board);
   },
   async sendItem(type) {
-    const opponent = this.getOpponent();
-    if (!opponent) return;
-    await this.relay("rr_item", { type, senderName: this.state.playerName }, opponent.id);
+    const opponents = this.getOpponents();
+    if (!opponents.length) return;
+    await Promise.all(opponents.map((opponent) =>
+      this.relay("rr_item", { type, senderName: this.state.playerName }, opponent.id)
+    ));
   },
   async rewardRoomPowerUp(type) {
     if (!this.state.connected) return;
     await this.relay("rr_powerup_reward", { type, senderName: this.state.playerName });
   },
   async siphonTransfer(amount) {
-    const opponent = this.getOpponent();
-    if (!opponent || amount <= 0) return;
-    await this.relay("rr_siphon_gain", { amount, senderName: this.state.playerName }, opponent.id);
+    const opponents = this.getOpponents();
+    if (!opponents.length || amount <= 0) return;
+    await Promise.all(opponents.map((opponent) =>
+      this.relay("rr_siphon_gain", { amount, senderName: this.state.playerName }, opponent.id)
+    ));
   }
 };
 
@@ -740,6 +746,7 @@ class ReflectRumbleGame {
       board.targets.forEach((target) => { target.vx *= SPEED_FACTOR; target.vy *= SPEED_FACTOR; });
     }
     this.setFeedback(`${payload?.senderName || "Opponent"} used ${POWER_UPS[type]?.label || "an item"} on you.`, "incorrect");
+    this.renderArena();
   }
 
   losePointsFromOpponent(amount, senderName) {
@@ -756,6 +763,16 @@ class ReflectRumbleGame {
     if (!POWER_UPS[type]) return;
     this.player.inventory[type] += 1;
     this.setFeedback(`${payload?.senderName || "A player"} earned a ${POWER_UPS[type].label} for everyone.`, "info");
+    if (this.player.board) {
+      this.renderArenaBoard();
+    }
+    this.reportStats();
+  }
+
+  grantPersonalPowerUpReward(type) {
+    if (!POWER_UPS[type]) return;
+    this.player.inventory[type] += 1;
+    this.setFeedback(`Bonus power-up earned: ${POWER_UPS[type].label}.`, "info");
     if (this.player.board) {
       this.renderArenaBoard();
     }
@@ -791,12 +808,12 @@ class ReflectRumbleGame {
     const centerBonus = Math.round(650 * accuracy * accuracy);
     let points = 500 + speedBonus + centerBonus;
     if (this.player.siphonBoostUntil > performance.now()) {
-      await RRMultiplayer.siphonTransfer(points);
+      await RRMultiplayer.siphonTransfer(SIPHON_STEAL_POINTS);
     }
     this.player.score += points;
-    if (RRMultiplayer.state.connected && this.powerUpsEnabled && this.difficultyKey === "easy") {
+    if (this.powerUpsEnabled && this.player.roundsCorrect > 0 && this.player.roundsCorrect % 3 === 0) {
       const rewardType = POWER_UP_KEYS[Math.floor(Math.random() * POWER_UP_KEYS.length)];
-      await RRMultiplayer.rewardRoomPowerUp(rewardType);
+      this.grantPersonalPowerUpReward(rewardType);
     }
     board.statusText = `Correct +${points}`;
     this.setFeedback(`Correct! +${points}`, "correct");

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse Recall</title>
+  <link rel="stylesheet" href="pulse-recall.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Associative Memory Offline Mode</p>
+        <h1>Pulse Recall</h1>
+      </div>
+      <div class="topbar-status">
+        <div class="status-chip">
+          <span>Questions</span>
+          <strong id="topbar-question-count">0</strong>
+        </div>
+        <div class="status-chip">
+          <span>Best Score</span>
+          <strong id="topbar-best-score">0</strong>
+        </div>
+        <div class="status-chip">
+          <span>Best Accuracy</span>
+          <strong id="topbar-best-accuracy">0%</strong>
+        </div>
+      </div>
+    </header>
+
+    <main class="screen-stack">
+      <section class="screen active" id="screen-main-menu">
+        <div class="hero-panel glass">
+          <div class="hero-copy">
+            <p class="eyebrow">Pulse Recall Offline Recreation</p>
+            <h2>Memorize the pairs. Hold the pulse.</h2>
+            <p class="hero-text">
+              Study your custom question-and-answer pairs, memorize the live board, and survive alternating
+              rounds where prompts switch between question-to-answer and answer-to-question recall.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" data-nav="screen-lobby">Play</button>
+              <button class="btn" data-nav="screen-question-library">Question Library</button>
+              <a class="btn" href="questions.html?returnTo=pulse-recall.html&returnLabel=Back%20to%20Pulse%20Recall">Edit Questions</a>
+              <a class="btn btn-ghost" href="lobby.html">Back to Lobby</a>
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="hero-stat-card">
+              <span>Recommended Setup</span>
+              <strong>6 pairs / Standard Match</strong>
+              <p>Balanced memorize time, enough distractors, and a clean alternating recall loop.</p>
+            </div>
+            <div class="hero-stat-card">
+              <span>Question Driven</span>
+              <strong>Uses Your Saved Bank</strong>
+              <p>The old card system is replaced by your custom question editor data.</p>
+            </div>
+            <div class="hero-stat-card">
+              <span>Mode Rule</span>
+              <strong>Offline Only</strong>
+              <p>Pulse Recall does not use rooms, multiplayer sync, or online settings.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-question-library">
+        <div class="screen-header">
+          <div>
+            <p class="eyebrow">Question Library</p>
+            <h2>Saved recall pairs</h2>
+          </div>
+          <button class="btn btn-ghost" data-nav="screen-main-menu">Back to Menu</button>
+        </div>
+
+        <div class="panel glass">
+          <div class="toolbar">
+            <div class="toolbar-search">
+              <input id="library-search" type="text" placeholder="Search by question or answer">
+            </div>
+            <div class="toolbar-summary">
+              <span>Total Questions</span>
+              <strong id="library-total-count">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="question-library-grid" id="question-library-list"></div>
+      </section>
+
+      <section class="screen" id="screen-lobby">
+        <div class="screen-header">
+          <div>
+            <p class="eyebrow">Lobby / Match Setup</p>
+            <h2>Shape the recall session</h2>
+          </div>
+          <button class="btn btn-ghost" data-nav="screen-main-menu">Back to Menu</button>
+        </div>
+
+        <div class="panel-grid lobby-grid">
+          <div class="panel glass">
+            <form id="lobby-form" novalidate>
+              <div class="field">
+                <label for="lobby-pair-count">Pair Count</label>
+                <select id="lobby-pair-count">
+                  <option value="4">4 Pairs</option>
+                  <option value="6" selected>6 Pairs</option>
+                  <option value="8">8 Pairs</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="lobby-intensity">Match Intensity</label>
+                <select id="lobby-intensity">
+                  <option value="standard">Standard Match</option>
+                  <option value="rematch">Rematch Series</option>
+                  <option value="endurance">Endurance Run</option>
+                </select>
+              </div>
+
+              <div class="setup-banner">
+                <span>Recommended</span>
+                <strong>6 pairs / Standard Match</strong>
+                <p>12 prompts total, 8 fixed answer options, 15 second memorize phase.</p>
+              </div>
+
+              <div class="inline-message error hidden" id="lobby-error"></div>
+
+              <div class="lobby-preview">
+                <div class="preview-card">
+                  <span>Question Bank</span>
+                  <strong id="preview-bank-name">Custom Questions</strong>
+                </div>
+                <div class="preview-card">
+                  <span>Pair Count</span>
+                  <strong id="preview-pair-count">6 pairs</strong>
+                </div>
+                <div class="preview-card">
+                  <span>Match Intensity</span>
+                  <strong id="preview-intensity">Standard Match</strong>
+                </div>
+                <div class="preview-card">
+                  <span>Total Prompts</span>
+                  <strong id="preview-total-prompts">12 prompts</strong>
+                </div>
+                <div class="preview-card">
+                  <span>Answer Board</span>
+                  <strong id="preview-board-size">8 options</strong>
+                </div>
+                <div class="preview-card">
+                  <span>Memorize Time</span>
+                  <strong id="preview-memorize-time">15s</strong>
+                </div>
+              </div>
+
+              <div class="preview-stack">
+                <div class="preview-card">
+                  <span>Direction Flow</span>
+                  <strong id="preview-round-clarity">Directions alternate every round.</strong>
+                </div>
+                <div class="preview-card">
+                  <span>Session Profile</span>
+                  <strong id="preview-profile">Balanced pressure with a fixed board.</strong>
+                </div>
+              </div>
+
+              <button class="btn btn-primary btn-block" type="submit">Begin Memorize Phase</button>
+            </form>
+          </div>
+
+          <div class="panel glass">
+            <div class="panel-heading">
+              <h3>Intensity Rules</h3>
+            </div>
+            <ul class="feature-list">
+              <li>One round = one full pass through every selected playable pair in one direction.</li>
+              <li>Standard Match = 2 rounds.</li>
+              <li>Rematch Series = 4 rounds.</li>
+              <li>Endurance Run = 6 rounds.</li>
+              <li>Round 1 uses answer prompts against a question board. Round 2 reverses it.</li>
+              <li>The answer board keeps 2 fixed distractors from your saved question bank.</li>
+              <li>Answer options never disappear, never shrink, and never move during the session.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-memorize">
+        <div class="screen-header compact">
+          <div>
+            <p class="eyebrow">Memorize Phase</p>
+            <h2>Study the live pair set</h2>
+          </div>
+          <div class="memorize-timer-wrap">
+            <span>Countdown</span>
+            <strong id="memorize-countdown">10.0s</strong>
+          </div>
+        </div>
+
+        <div class="panel glass">
+          <div class="memorize-grid" id="memorize-grid"></div>
+          <div class="form-actions center">
+            <button class="btn btn-primary hidden" id="start-early-btn" type="button">Start Early</button>
+            <button class="btn btn-ghost" id="cancel-match-btn" type="button">Cancel Match</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-match">
+        <div class="match-layout">
+          <aside class="match-sidebar glass">
+            <div class="match-stat">
+              <span>Score</span>
+              <strong id="match-score">0</strong>
+            </div>
+            <div class="match-stat">
+              <span>Round</span>
+              <strong id="match-round-label">1 / 2</strong>
+            </div>
+            <div class="match-stat">
+              <span>Question</span>
+              <strong id="match-question-label">1 / 6</strong>
+            </div>
+            <div class="match-stat">
+              <span>Streak</span>
+              <strong id="match-streak">0</strong>
+            </div>
+
+            <div class="pulse-panel">
+              <div class="pulse-header">
+                <span>Group Pulse</span>
+                <strong id="pulse-percent">52%</strong>
+              </div>
+              <div class="pulse-track">
+                <div class="pulse-fill" id="pulse-fill"></div>
+              </div>
+              <p id="pulse-message">Calm focus. The room is settling in.</p>
+            </div>
+
+            <div class="match-timer">
+              <span>Answer Timer</span>
+              <strong id="question-timer">10.0s</strong>
+              <div class="timer-track">
+                <div class="timer-fill" id="question-timer-fill"></div>
+              </div>
+            </div>
+          </aside>
+
+          <div class="match-main">
+            <div class="panel glass prompt-panel">
+              <div class="round-direction" id="round-direction-label">Prompt: answer | Board: question</div>
+              <div class="prompt-card" id="prompt-card">Prompt text</div>
+              <div class="feedback-strip" id="feedback-strip">Lock in the matching association.</div>
+            </div>
+
+            <div class="answer-board" id="answer-board"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-results">
+        <div class="screen-header">
+          <div>
+            <p class="eyebrow">Results</p>
+            <h2>Session complete</h2>
+          </div>
+          <button class="btn btn-ghost" data-nav="screen-main-menu">Back to Menu</button>
+        </div>
+
+        <div class="results-grid">
+          <div class="result-card glass">
+            <span>Score</span>
+            <strong id="result-score">0</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Match Accuracy</span>
+            <strong id="result-accuracy">0%</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Recall Time</span>
+            <strong id="result-recall-time">0.0s</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Correct Answers</span>
+            <strong id="result-correct">0</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Misses</span>
+            <strong id="result-misses">0</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Memory Streak</span>
+            <strong id="result-streak">0</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Personal Best</span>
+            <strong id="result-personal-best">0</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Group Pulse Summary</span>
+            <strong id="result-pulse-summary">Steady</strong>
+          </div>
+          <div class="result-card glass">
+            <span>Session Profile</span>
+            <strong id="result-session-profile">Balanced</strong>
+          </div>
+        </div>
+
+        <div class="panel glass result-summary-panel">
+          <div class="result-summary-copy">
+            <span>Best Tracker</span>
+            <strong id="result-best-label">No personal best yet</strong>
+          </div>
+        </div>
+
+        <div class="panel glass result-actions">
+          <button class="btn btn-primary" id="play-again-btn" type="button">Play Again</button>
+          <button class="btn" data-nav="screen-lobby">Adjust Setup</button>
+          <button class="btn btn-ghost" data-nav="screen-main-menu">Main Menu</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="pulse-recall.js"></script>
+</body>
+</html>

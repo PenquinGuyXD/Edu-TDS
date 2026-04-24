@@ -14,6 +14,11 @@ const GAMES = [
     description: "Fast arcade FPS action powered by the files in the fps folder."
   },
   {
+    id: "pulse-recall",
+    name: "Pulse Recall",
+    description: "Memorize question-answer pairs, then survive alternating recall rounds offline."
+  },
+  {
     id: "practice-tests",
     name: "Practice Tests",
     description: "Take a custom-question practice test and review analytics at the end."
@@ -145,6 +150,7 @@ function getDefaultDurationForGame(gameId) {
 
 function getGameLaunchPath(gameId) {
   if (gameId === "reflect-rumble") return "brainrush-arcade-launcher.html";
+  if (gameId === "pulse-recall") return "pulse-recall.html";
   if (gameId === "practice-tests") return "practice-tests.html";
   return "index.html";
 }
@@ -276,7 +282,7 @@ const Lobby = {
     const list = this.elements.gameSelectionList;
     list.innerHTML = "";
     const visibleGames = (this.state.currentView === "online" || this.state.connected)
-      ? GAMES.filter((game) => game.id !== "practice-tests")
+      ? GAMES.filter((game) => game.id !== "practice-tests" && game.id !== "pulse-recall")
       : GAMES;
     if (this.state.connected && !this.isHost()) {
       const notice = document.createElement("div");
@@ -386,7 +392,7 @@ const Lobby = {
     this.elements.rrDifficultySelect.value = this.state.rrDifficulty || DEFAULT_RR_DIFFICULTY;
     this.elements.rrPowerupsEnabled.checked = this.state.rrPowerupsEnabled !== false;
     const rrControlsVisible = this.state.selectedGameId === "reflect-rumble";
-    const timerVisible = this.state.selectedGameId !== "practice-tests";
+    const timerVisible = !["practice-tests", "pulse-recall"].includes(this.state.selectedGameId);
     this.elements.matchDurationInput.closest(".timer-config-row")?.classList.toggle("hidden", !timerVisible);
     this.elements.rrDifficultySelect.closest(".rr-config-row")?.classList.toggle("hidden", !rrControlsVisible);
     this.renderGames();

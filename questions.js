@@ -33,6 +33,21 @@ const starterPresets = [
       { question: "The pyramids are in which country?", options: ["Greece", "Mexico", "Egypt", "India"], answer: "Egypt", reward: 20 },
       { question: "Which ocean is the largest?", options: ["Atlantic", "Indian", "Pacific", "Arctic"], answer: "Pacific", reward: 20 }
     ]
+  },
+  {
+    id: "starter-random-8",
+    name: "Random 8 Pack",
+    source: "starter",
+    questions: [
+      { question: "What is 7 x 8?", options: ["54", "56", "64", "58"], answer: "56", reward: 25 },
+      { question: "Plants absorb which gas?", options: ["Oxygen", "Helium", "Carbon Dioxide", "Nitrogen"], answer: "Carbon Dioxide", reward: 25 },
+      { question: "What is 45 + 18?", options: ["63", "53", "73", "61"], answer: "63", reward: 20 },
+      { question: "The pyramids are in which country?", options: ["Greece", "Mexico", "Egypt", "India"], answer: "Egypt", reward: 20 },
+      { question: "What planet is known as the Red Planet?", options: ["Mars", "Venus", "Mercury", "Jupiter"], answer: "Mars", reward: 25 },
+      { question: "Who was the first President of the United States?", options: ["George Washington", "Thomas Jefferson", "Abraham Lincoln", "John Adams"], answer: "George Washington", reward: 25 },
+      { question: "What is 81 / 9?", options: ["7", "8", "9", "10"], answer: "9", reward: 20 },
+      { question: "Water freezes at what temperature in Celsius?", options: ["10", "0", "32", "-10"], answer: "0", reward: 20 }
+    ]
   }
 ];
 
@@ -41,6 +56,7 @@ const state = {
 };
 
 const elements = {
+  editorBackLink: document.getElementById("editorBackLink"),
   form: document.getElementById("questionForm"),
   questionText: document.getElementById("questionText"),
   option1: document.getElementById("option1"),
@@ -66,6 +82,26 @@ const elements = {
   shareCodeInput: document.getElementById("shareCodeInput"),
   shareMessage: document.getElementById("shareMessage")
 };
+
+function applyReturnLink() {
+  const params = new URLSearchParams(window.location.search);
+  const returnTo = String(params.get("returnTo") || "").trim();
+  const returnLabel = String(params.get("returnLabel") || "").trim();
+  if (!returnTo) return;
+
+  const isSafeLocalTarget =
+    !returnTo.startsWith("http://") &&
+    !returnTo.startsWith("https://") &&
+    !returnTo.startsWith("//") &&
+    !returnTo.startsWith("javascript:");
+
+  if (!isSafeLocalTarget) return;
+
+  elements.editorBackLink.href = returnTo;
+  if (returnLabel) {
+    elements.editorBackLink.textContent = returnLabel;
+  }
+}
 
 function ensureStarterPresets() {
   if (localStorage.getItem(QUESTION_PRESETS_SEEDED_KEY)) return;
@@ -463,6 +499,7 @@ elements.exportPresetButton.addEventListener("click", async () => {
 elements.importPresetButton.addEventListener("click", () => importSharedPreset());
 
 ensureStarterPresets();
+applyReturnLink();
 renderSavedQuestions();
 renderPresets();
 renderSharePresetOptions();
