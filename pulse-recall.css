@@ -427,6 +427,12 @@ h2 { margin-bottom: 10px; font-size: clamp(1.6rem, 2.5vw, 2.3rem); }
 
 .form-actions.center { justify-content: center; }
 
+.bottom-menu-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
 .match-layout {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

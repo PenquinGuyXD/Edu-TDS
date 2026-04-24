@@ -39,8 +39,8 @@
             <p class="eyebrow">Pulse Recall Offline Recreation</p>
             <h2>Memorize the pairs. Hold the pulse.</h2>
             <p class="hero-text">
-              Study your custom question-and-answer pairs, memorize the live board, and survive alternating
-              rounds where prompts switch between question-to-answer and answer-to-question recall.
+              Study your custom question-and-answer pairs, memorize the live board, and survive escalating
+              rounds that use each saved question's real answer options from your editor.
             </p>
             <div class="hero-actions">
               <button class="btn btn-primary" data-nav="screen-lobby">Play</button>
@@ -106,15 +106,6 @@
           <div class="panel glass">
             <form id="lobby-form" novalidate>
               <div class="field">
-                <label for="lobby-pair-count">Pair Count</label>
-                <select id="lobby-pair-count">
-                  <option value="4">4 Pairs</option>
-                  <option value="6" selected>6 Pairs</option>
-                  <option value="8">8 Pairs</option>
-                </select>
-              </div>
-
-              <div class="field">
                 <label for="lobby-intensity">Match Intensity</label>
                 <select id="lobby-intensity">
                   <option value="standard">Standard Match</option>
@@ -125,8 +116,8 @@
 
               <div class="setup-banner">
                 <span>Recommended</span>
-                <strong>6 pairs / Standard Match</strong>
-                <p>12 prompts total, 8 fixed answer options, 15 second memorize phase.</p>
+                <strong>4-option questions / Standard Match</strong>
+                <p>Uses your full saved question set, 4 answer options per question, and a memorize phase sized to the run.</p>
               </div>
 
               <div class="inline-message error hidden" id="lobby-error"></div>
@@ -137,8 +128,8 @@
                   <strong id="preview-bank-name">Custom Questions</strong>
                 </div>
                 <div class="preview-card">
-                  <span>Pair Count</span>
-                  <strong id="preview-pair-count">6 pairs</strong>
+                  <span>Question Count</span>
+                  <strong id="preview-pair-count">0 questions</strong>
                 </div>
                 <div class="preview-card">
                   <span>Match Intensity</span>
@@ -178,13 +169,13 @@
               <h3>Intensity Rules</h3>
             </div>
             <ul class="feature-list">
-              <li>One round = one full pass through every selected playable pair in one direction.</li>
+              <li>One round = one full pass through your full saved question set.</li>
               <li>Standard Match = 2 rounds.</li>
               <li>Rematch Series = 4 rounds.</li>
               <li>Endurance Run = 6 rounds.</li>
-              <li>Round 1 uses answer prompts against a question board. Round 2 reverses it.</li>
-              <li>The answer board keeps 2 fixed distractors from your saved question bank.</li>
-              <li>Answer options never disappear, never shrink, and never move during the session.</li>
+              <li>Every prompt uses the exact options saved in the question editor.</li>
+              <li>Options are shuffled each time the question appears.</li>
+              <li>The match still keeps the memorize phase, pulse system, and score pressure from Pulse Recall.</li>
             </ul>
           </div>
         </div>
@@ -208,6 +199,9 @@
             <button class="btn btn-primary hidden" id="start-early-btn" type="button">Start Early</button>
             <button class="btn btn-ghost" id="cancel-match-btn" type="button">Cancel Match</button>
           </div>
+        </div>
+        <div class="bottom-menu-row">
+          <button class="btn btn-ghost" data-nav="screen-main-menu" type="button">Main Menu</button>
         </div>
       </section>
 
@@ -260,6 +254,9 @@
 
             <div class="answer-board" id="answer-board"></div>
           </div>
+        </div>
+        <div class="bottom-menu-row">
+          <button class="btn btn-ghost" data-nav="screen-main-menu" type="button">Main Menu</button>
         </div>
       </section>
 

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rythem Mania</title>
+  <link rel="stylesheet" href="rythem-mania.css">
+</head>
+<body>
+  <main class="app-shell" aria-live="polite">
+    <section id="menu-screen" class="screen active">
+      <div class="menu-layout">
+        <section class="hero-panel">
+          <p class="eyebrow">Rythem Mania</p>
+          <h1>Study on the beat.</h1>
+          <p class="intro">
+            An offline four-lane quiz rhythm game. Read the prompt, survive the filler notes,
+            then hit the lane that matches the correct answer when the highlighted question row lands.
+          </p>
+
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <span>Startup</span>
+              <strong>10s</strong>
+            </div>
+            <div class="hero-stat">
+              <span>Lanes</span>
+              <strong>4 Keys</strong>
+            </div>
+            <div class="hero-stat">
+              <span>Source</span>
+              <strong>Question Bank</strong>
+            </div>
+          </div>
+
+          <div class="key-strip" aria-label="Controls">
+            <span id="menu-key-0">D</span>
+            <span id="menu-key-1">F</span>
+            <span id="menu-key-2">J</span>
+            <span id="menu-key-3">K</span>
+          </div>
+        </section>
+
+        <section class="control-panel">
+          <div class="panel-block">
+            <div class="block-head">
+              <p class="section-kicker">Input</p>
+              <h2>Keybinds</h2>
+            </div>
+            <div class="keybind-grid">
+              <label class="keybind-field" for="keybind-input-0">
+                <span>Lane 1</span>
+                <input id="keybind-input-0" type="text" value="D" readonly>
+              </label>
+              <label class="keybind-field" for="keybind-input-1">
+                <span>Lane 2</span>
+                <input id="keybind-input-1" type="text" value="F" readonly>
+              </label>
+              <label class="keybind-field" for="keybind-input-2">
+                <span>Lane 3</span>
+                <input id="keybind-input-2" type="text" value="J" readonly>
+              </label>
+              <label class="keybind-field" for="keybind-input-3">
+                <span>Lane 4</span>
+                <input id="keybind-input-3" type="text" value="K" readonly>
+              </label>
+            </div>
+            <p id="keybind-status" class="helper-panel">Click a lane key box and press a key to remap it.</p>
+          </div>
+
+          <div class="panel-block">
+            <div class="block-head">
+              <p class="section-kicker">Run Setup</p>
+              <h2>Settings</h2>
+            </div>
+            <div class="settings-grid">
+              <label class="field-stack" for="difficulty-select">
+                <span>Difficulty</span>
+                <select id="difficulty-select">
+                  <option value="easy">Easy</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label class="field-stack" for="bpm-select">
+                <span>Tempo</span>
+                <select id="bpm-select">
+                  <option value="80" selected>80 BPM</option>
+                  <option value="96">96 BPM</option>
+                  <option value="120">120 BPM</option>
+                  <option value="144">144 BPM</option>
+                  <option value="168">168 BPM</option>
+                </select>
+              </label>
+              <label class="field-stack" for="travel-select">
+                <span>Scroll Speed</span>
+                <select id="travel-select">
+                  <option value="2.4">Relaxed</option>
+                  <option value="2.05" selected>Standard</option>
+                  <option value="1.7">Fast</option>
+                </select>
+              </label>
+              <label class="field-stack" for="question-count-select">
+                <span>Question Run</span>
+                <select id="question-count-select">
+                  <option value="16">16 Questions</option>
+                  <option value="24" selected>24 Questions</option>
+                  <option value="32">32 Questions</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="menu-actions">
+            <p id="question-bank-status" class="helper-panel compact-status">Checking your saved question bank.</p>
+            <button id="start-btn" class="primary-btn">Start Run</button>
+            <a class="secondary-btn link-btn" href="questions.html?returnTo=rythem-mania.html&returnLabel=Back%20to%20Rythem%20Mania">Question Editor</a>
+            <a class="secondary-btn link-btn" href="lobby.html">Back To Lobby</a>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="game-screen" class="screen">
+      <header class="hud">
+        <div><span class="hud-label">Score</span><strong id="score-display">0</strong></div>
+        <div><span class="hud-label">Combo</span><strong id="combo-display">0x</strong></div>
+        <div><span class="hud-label">Accuracy</span><strong id="accuracy-display">100%</strong></div>
+        <div><span class="hud-label">Beat</span><strong id="beat-display">Startup</strong></div>
+      </header>
+
+      <section class="question-card">
+        <div class="question-head">
+          <p class="question-meta">Current Prompt</p>
+          <span class="question-chip">Answer Row</span>
+        </div>
+        <h2 id="question-text">Press Start to begin.</h2>
+        <div id="lane-answer-row" class="lane-answer-row" aria-label="Lane answers"></div>
+      </section>
+
+      <section class="mania-stage">
+        <div class="judgment-banner">
+          <span id="judgment-text">Ready</span>
+          <span id="timing-text">Hit D F J K on the line</span>
+        </div>
+
+        <div id="lane-board" class="lane-board" aria-label="Rhythm lanes">
+          <div class="lane-guide">
+            <div class="lane-divider"></div>
+            <div class="lane-divider"></div>
+            <div class="lane-divider"></div>
+          </div>
+          <div id="notes-layer" class="notes-layer"></div>
+          <div class="judgment-line"></div>
+          <div class="receptor-row">
+            <div class="receptor receptor-1"><span id="receptor-key-0">D</span></div>
+            <div class="receptor receptor-2"><span id="receptor-key-1">F</span></div>
+            <div class="receptor receptor-3"><span id="receptor-key-2">J</span></div>
+            <div class="receptor receptor-4"><span id="receptor-key-3">K</span></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="footer-actions">
+        <button id="back-menu-btn" class="secondary-btn">Main Menu</button>
+      </div>
+    </section>
+
+    <section id="game-over-screen" class="screen">
+      <div class="result-card">
+        <p class="eyebrow">Run Complete</p>
+        <h2 id="result-title">Your study sprint is over.</h2>
+        <p id="result-score" class="result-score">0</p>
+        <p id="result-stats" class="result-stats"></p>
+        <div id="question-summary" class="question-summary" aria-live="polite"></div>
+        <div class="result-actions">
+          <button id="restart-btn" class="primary-btn">Play Again</button>
+          <button id="menu-btn" class="secondary-btn">Main Menu</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="rythem-mania.js"></script>
+</body>
+</html>

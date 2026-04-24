@@ -8,7 +8,6 @@
 
   const LIMITS = {
     answerSeconds: 10,
-    memorizeSeconds: { 4: 10, 6: 15, 8: 20 },
     intensityRounds: { standard: 2, rematch: 4, endurance: 6 }
   };
 
@@ -23,7 +22,6 @@
       lastBestLabel: "No personal best yet"
     },
     recentSettings: {
-      pairCount: 6,
       intensity: "standard"
     },
     ui: {
@@ -56,7 +54,7 @@
   function cacheElements() {
     [
       "topbar-question-count", "topbar-best-score", "topbar-best-accuracy", "library-search", "library-total-count",
-      "question-library-list", "lobby-form", "lobby-pair-count", "lobby-intensity", "lobby-error",
+      "question-library-list", "lobby-form", "lobby-intensity", "lobby-error",
       "preview-bank-name", "preview-pair-count", "preview-intensity", "preview-total-prompts", "preview-board-size",
       "preview-memorize-time", "preview-round-clarity", "preview-profile", "memorize-grid", "memorize-countdown",
       "start-early-btn", "cancel-match-btn", "answer-board", "prompt-card", "feedback-strip", "match-score",
@@ -78,7 +76,6 @@
     });
     el.librarySearch.addEventListener("input", renderQuestionLibrary);
     el.lobbyForm.addEventListener("submit", onBeginMatch);
-    el.lobbyPairCount.addEventListener("change", updateLobbyPreview);
     el.lobbyIntensity.addEventListener("change", updateLobbyPreview);
     el.startEarlyBtn.addEventListener("click", () => startMatchLoop(true));
     el.cancelMatchBtn.addEventListener("click", cancelCurrentMatch);
@@ -189,32 +186,30 @@
   }
 
   function syncRecentSettings() {
-    state.recentSettings.pairCount = Number(state.recentSettings.pairCount) || 6;
     state.recentSettings.intensity = LIMITS.intensityRounds[state.recentSettings.intensity]
       ? state.recentSettings.intensity
       : "standard";
-    el.lobbyPairCount.value = String(state.recentSettings.pairCount);
     el.lobbyIntensity.value = state.recentSettings.intensity;
   }
 
   function updateLobbyPreview() {
-    const pairCount = Number(el.lobbyPairCount.value || state.recentSettings.pairCount || 6);
     const intensity = el.lobbyIntensity.value || state.recentSettings.intensity || "standard";
-    const summary = getSessionSummary(pairCount, intensity);
+    const questionCount = state.questions.length;
+    const summary = getSessionSummary(questionCount, intensity);
 
-    el.previewBankName.textContent = `${state.questions.length} saved questions`;
-    el.previewPairCount.textContent = `${pairCount} pairs`;
+    el.previewBankName.textContent = `${questionCount} saved questions`;
+    el.previewPairCount.textContent = `${questionCount} question${questionCount === 1 ? "" : "s"}`;
     el.previewIntensity.textContent = intensityLabel(intensity);
     el.previewTotalPrompts.textContent = `${summary.totalPrompts} prompts`;
     el.previewBoardSize.textContent = `${summary.boardSize} options`;
     el.previewMemorizeTime.textContent = `${summary.memorizeSeconds}s`;
-    el.previewRoundClarity.textContent = `${summary.totalRounds} rounds total. One round is one full pass through ${pairCount} playable pairs in one direction.`;
-    el.previewProfile.textContent = sessionProfileLabel(pairCount, intensity);
+    el.previewRoundClarity.textContent = `${summary.totalRounds} rounds total. Each round runs your full saved question set using the real answer options from the question editor.`;
+    el.previewProfile.textContent = sessionProfileLabel(questionCount, intensity);
 
     if (state.questions.length < summary.requiredQuestionCount) {
       setInlineError(
         el.lobbyError,
-        `You need at least ${summary.requiredQuestionCount} custom questions for a ${pairCount}-pair run because the board keeps 2 fixed distractors.`
+        "You need at least 1 saved question to play Pulse Recall."
       );
       return;
     }
@@ -224,52 +219,49 @@
 
   function onBeginMatch(event) {
     event.preventDefault();
-    const pairCount = Number(el.lobbyPairCount.value);
     const intensity = el.lobbyIntensity.value;
-    const summary = getSessionSummary(pairCount, intensity);
+    const questionCount = state.questions.length;
+    const summary = getSessionSummary(questionCount, intensity);
 
     if (state.questions.length < summary.requiredQuestionCount) {
       setInlineError(
         el.lobbyError,
-        `You only have ${state.questions.length} saved questions. ${pairCount}-pair runs require ${summary.requiredQuestionCount}.`
+        "You need at least 1 saved question before starting a Pulse Recall run."
       );
       return;
     }
 
     clearInlineError(el.lobbyError);
-    state.recentSettings = { pairCount, intensity };
+    state.recentSettings = { intensity };
     persistRecent();
-    startMemorizePhase(pairCount, intensity);
+    startMemorizePhase(intensity);
   }
 
-  function startMemorizePhase(pairCount, intensity) {
+  function startMemorizePhase(intensity) {
     cleanupGameTimers();
 
-    const playablePairs = sample(state.questions, pairCount);
-    const distractorPool = state.questions.filter((question) => !playablePairs.some((pair) => pair.id === question.id));
-    const distractors = sample(distractorPool, 2);
-    const rounds = buildRoundPlan(playablePairs, intensity);
+    const playableQuestions = shuffle(state.questions.slice());
+    const rounds = buildRoundPlan(playableQuestions, intensity);
+    const memorizeSeconds = getMemorizeSeconds(playableQuestions.length);
 
     state.game = {
-      pairCount,
+      pairCount: playableQuestions.length,
       intensity,
       rounds,
       currentRoundIndex: 0,
       currentQuestionIndex: 0,
-      playablePairs,
-      distractors,
-      boardPairs: shuffle(playablePairs.concat(distractors)),
+      playableQuestions,
       score: 0,
       streak: 0,
       bestStreak: 0,
       correctAnswers: 0,
       wrongAnswers: 0,
-      totalQuestions: rounds.length * playablePairs.length,
+      totalQuestions: rounds.length * playableQuestions.length,
       totalRecallMs: 0,
       pulse: 52,
       pulseMessage: "Calm focus. The room is settling in.",
       memorizeStartedAt: performance.now(),
-      memorizeDurationMs: LIMITS.memorizeSeconds[pairCount] * 1000,
+      memorizeDurationMs: memorizeSeconds * 1000,
       memorizeInterval: null,
       questionInterval: null,
       currentQuestion: null,
@@ -289,8 +281,6 @@
     for (let index = 0; index < totalRounds; index += 1) {
       rounds.push({
         roundNumber: index + 1,
-        boardSide: index % 2 === 0 ? "left" : "right",
-        promptSide: index % 2 === 0 ? "right" : "left",
         promptOrder: shuffle(playablePairs.slice())
       });
     }
@@ -300,7 +290,7 @@
 
   function renderMemorizeGrid() {
     const game = state.game;
-    el.memorizeGrid.innerHTML = game.playablePairs.map((pair) => `
+    el.memorizeGrid.innerHTML = game.playableQuestions.map((pair) => `
       <article class="memorize-pair">
         <span>${escapeHtml(pair.tag)}</span>
         <strong>${escapeHtml(pair.left)}</strong>
@@ -379,32 +369,29 @@
   function renderPrompt() {
     const game = state.game;
     const current = game.currentQuestion;
-    const promptText = current.round.promptSide === "left" ? current.pair.left : current.pair.right;
-    const boardLabel = current.round.boardSide === "left" ? "question" : "answer";
-    const promptLabel = current.round.promptSide === "left" ? "question" : "answer";
-
-    const answers = game.boardPairs.map((item) => ({
-      id: item.id,
-      text: current.round.boardSide === "left" ? item.left : item.right,
-      correct: item.id === current.pair.id
+    const promptText = current.pair.left;
+    const answers = shuffle(current.pair.options.slice()).map((optionText, index) => ({
+      id: `${current.pair.id}-option-${index}`,
+      text: optionText,
+      correct: optionText === current.pair.right
     }));
 
     el.matchScore.textContent = String(game.score);
     el.matchRoundLabel.textContent = `${current.round.roundNumber} / ${game.rounds.length}`;
-    el.matchQuestionLabel.textContent = `${game.currentQuestionIndex + 1} / ${game.playablePairs.length}`;
+    el.matchQuestionLabel.textContent = `${game.currentQuestionIndex + 1} / ${game.playableQuestions.length}`;
     el.matchStreak.textContent = String(game.streak);
-    el.roundDirectionLabel.textContent = `Prompt: ${promptLabel} | Board: ${boardLabel}`;
+    el.roundDirectionLabel.textContent = "Prompt: question | Board: saved answer options";
     el.promptCard.textContent = promptText;
-    el.feedbackStrip.textContent = "Lock in the matching association.";
+    el.feedbackStrip.textContent = "Pick the correct answer from the saved options.";
     el.answerBoard.innerHTML = answers.map((answer, index) => `
-      <button class="answer-option" data-answer-id="${answer.id}" type="button">
+      <button class="answer-option" data-answer-text="${escapeHtml(answer.text)}" data-correct="${answer.correct ? "true" : "false"}" type="button">
         <span>Option ${index + 1}</span>
         <strong>${escapeHtml(answer.text)}</strong>
       </button>
     `).join("");
 
     el.answerBoard.querySelectorAll(".answer-option").forEach((button) => {
-      button.addEventListener("click", () => submitAnswer(button.dataset.answerId));
+      button.addEventListener("click", () => submitAnswer(button.dataset.answerText));
     });
   }
 
@@ -439,10 +426,10 @@
     }
 
     const elapsed = forcedElapsed ?? Math.max(0, LIMITS.answerSeconds * 1000 - parseFloat(el.questionTimer.textContent || "0") * 1000);
-    const correctId = game.currentQuestion.pair.id;
-    const correct = answerId === correctId;
+    const correctAnswer = game.currentQuestion.pair.right;
+    const correct = answerId === correctAnswer;
 
-    highlightAnswers(correctId, answerId);
+    highlightAnswers(correctAnswer, answerId);
 
     if (correct) {
       const points = Math.max(120, Math.round(340 + ((LIMITS.answerSeconds * 1000 - elapsed) / 16)));
@@ -459,9 +446,7 @@
       game.streak = 0;
       game.pulse = Math.max(0, game.pulse - (timedOut ? 10 : 8));
       updatePulse(timedOut ? "Too slow. The pulse dips hard." : "Wrong association. Recover your rhythm.", game.pulse);
-      const correctText = game.currentQuestion.round.boardSide === "left"
-        ? game.currentQuestion.pair.left
-        : game.currentQuestion.pair.right;
+      const correctText = game.currentQuestion.pair.right;
       el.feedbackStrip.textContent = timedOut
         ? `Time. Correct answer: ${correctText}`
         : `Incorrect. Correct answer: ${correctText}`;
@@ -476,13 +461,13 @@
     }, 850);
   }
 
-  function highlightAnswers(correctId, selectedId) {
+  function highlightAnswers(correctAnswer, selectedAnswer) {
     el.answerBoard.querySelectorAll(".answer-option").forEach((button) => {
       button.disabled = true;
-      if (button.dataset.answerId === correctId) {
+      if (button.dataset.answerText === correctAnswer) {
         button.classList.add("correct");
       }
-      if (selectedId && button.dataset.answerId === selectedId && selectedId !== correctId) {
+      if (selectedAnswer && button.dataset.answerText === selectedAnswer && selectedAnswer !== correctAnswer) {
         button.classList.add("incorrect");
       }
     });
@@ -552,7 +537,7 @@
   }
 
   function sessionProfileLabel(pairCount, intensity) {
-    const pairText = `${pairCount}-pair`;
+    const pairText = `${pairCount}-question`;
     const intensityText = {
       standard: "balanced",
       rematch: "extended",
@@ -578,12 +563,18 @@
   function getSessionSummary(pairCount, intensity) {
     const totalRounds = LIMITS.intensityRounds[intensity] || LIMITS.intensityRounds.standard;
     return {
-      requiredQuestionCount: pairCount + 2,
+      requiredQuestionCount: 1,
       totalRounds,
       totalPrompts: totalRounds * pairCount,
-      boardSize: pairCount + 2,
-      memorizeSeconds: LIMITS.memorizeSeconds[pairCount] || 15
+      boardSize: 4,
+      memorizeSeconds: getMemorizeSeconds(pairCount)
     };
+  }
+
+  function getMemorizeSeconds(questionCount) {
+    if (questionCount <= 4) return 10;
+    if (questionCount <= 8) return 15;
+    return 20;
   }
 
   function intensityLabel(intensity) {
@@ -592,10 +583,6 @@
       rematch: "Rematch Series",
       endurance: "Endurance Run"
     }[intensity] || "Standard Match";
-  }
-
-  function sample(items, count) {
-    return shuffle(items.slice()).slice(0, count);
   }
 
   function shuffle(items) {

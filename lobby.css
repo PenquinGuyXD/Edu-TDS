@@ -261,6 +261,10 @@ label span,
   justify-content: flex-start;
 }
 
+.timer-config-row.hidden {
+  display: none;
+}
+
 .rr-config-row {
   margin-top: 12px;
   display: grid;

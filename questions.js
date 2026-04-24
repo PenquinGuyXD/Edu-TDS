@@ -48,6 +48,21 @@ const starterPresets = [
       { question: "What is 81 / 9?", options: ["7", "8", "9", "10"], answer: "9", reward: 20 },
       { question: "Water freezes at what temperature in Celsius?", options: ["10", "0", "32", "-10"], answer: "0", reward: 20 }
     ]
+  },
+  {
+    id: "starter-random-8-b",
+    name: "Random 8 Pack B",
+    source: "starter",
+    questions: [
+      { question: "Water freezes at what temperature in Celsius?", options: ["10", "0", "32", "-10"], answer: "0", reward: 20 },
+      { question: "What is 45 + 18?", options: ["63", "53", "73", "61"], answer: "63", reward: 20 },
+      { question: "Which ocean is the largest?", options: ["Atlantic", "Indian", "Pacific", "Arctic"], answer: "Pacific", reward: 20 },
+      { question: "Plants absorb which gas?", options: ["Oxygen", "Helium", "Carbon Dioxide", "Nitrogen"], answer: "Carbon Dioxide", reward: 25 },
+      { question: "Who was the first President of the United States?", options: ["George Washington", "Thomas Jefferson", "Abraham Lincoln", "John Adams"], answer: "George Washington", reward: 25 },
+      { question: "What planet is known as the Red Planet?", options: ["Mars", "Venus", "Mercury", "Jupiter"], answer: "Mars", reward: 25 },
+      { question: "The pyramids are in which country?", options: ["Greece", "Mexico", "Egypt", "India"], answer: "Egypt", reward: 20 },
+      { question: "What is 7 x 8?", options: ["54", "56", "64", "58"], answer: "56", reward: 25 }
+    ]
   }
 ];
 
@@ -350,16 +365,44 @@ function getPresetById(id) {
   return getSavedPresets().find((preset) => preset.id === id) || null;
 }
 
+function encodeBase64Unicode(value) {
+  const input = String(value || "");
+  if (typeof TextEncoder !== "undefined") {
+    const bytes = new TextEncoder().encode(input);
+    let binary = "";
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
+  }
+  return btoa(unescape(encodeURIComponent(input)));
+}
+
+function decodeBase64Unicode(value) {
+  const normalized = String(value || "")
+    .replace(/[\r\n\s]+/g, "")
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+  const binary = atob(padded);
+
+  if (typeof TextDecoder !== "undefined") {
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+  return decodeURIComponent(escape(binary));
+}
+
 function encodePresetForShare(preset) {
   const payload = { name: preset.name, questions: preset.questions };
-  return `${SHARED_PRESET_PREFIX}${btoa(unescape(encodeURIComponent(JSON.stringify(payload))))}`;
+  return `${SHARED_PRESET_PREFIX}${encodeBase64Unicode(JSON.stringify(payload))}`;
 }
 
 function decodeSharedPreset(rawCode) {
   const code = String(rawCode || "").trim();
   if (!code.startsWith(SHARED_PRESET_PREFIX)) return null;
   try {
-    const json = decodeURIComponent(escape(atob(code.slice(SHARED_PRESET_PREFIX.length))));
+    const json = decodeBase64Unicode(code.slice(SHARED_PRESET_PREFIX.length));
     return sanitizePreset(JSON.parse(json));
   } catch (error) {
     return null;

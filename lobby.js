@@ -19,6 +19,11 @@ const GAMES = [
     description: "Memorize question-answer pairs, then survive alternating recall rounds offline."
   },
   {
+    id: "rythem-mania",
+    name: "Rythem Mania",
+    description: "A four-lane offline rhythm quiz that pulls prompts from your saved question bank."
+  },
+  {
     id: "practice-tests",
     name: "Practice Tests",
     description: "Take a custom-question practice test and review analytics at the end."
@@ -151,6 +156,7 @@ function getDefaultDurationForGame(gameId) {
 function getGameLaunchPath(gameId) {
   if (gameId === "reflect-rumble") return "brainrush-arcade-launcher.html";
   if (gameId === "pulse-recall") return "pulse-recall.html";
+  if (gameId === "rythem-mania") return "rythem-mania.html";
   if (gameId === "practice-tests") return "practice-tests.html";
   return "index.html";
 }
@@ -282,7 +288,7 @@ const Lobby = {
     const list = this.elements.gameSelectionList;
     list.innerHTML = "";
     const visibleGames = (this.state.currentView === "online" || this.state.connected)
-      ? GAMES.filter((game) => game.id !== "practice-tests" && game.id !== "pulse-recall")
+      ? GAMES.filter((game) => !["practice-tests", "pulse-recall", "rythem-mania"].includes(game.id))
       : GAMES;
     if (this.state.connected && !this.isHost()) {
       const notice = document.createElement("div");
